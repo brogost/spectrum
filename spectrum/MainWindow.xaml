@@ -20,7 +20,7 @@
     	    	<RowDefinition Height="auto"/>
         		<RowDefinition Height="auto"/>
         	</Grid.RowDefinitions>
-        	<spectrum:MyCanvas Grid.Row="0" Height="500" HorizontalAlignment="Stretch" x:Name="canvas1" Margin="0,0,-889,0" VerticalAlignment="Bottom" d:LayoutOverrides="Height"/>
+        	<spectrum:MyCanvas Grid.Row="0" Height="500" HorizontalAlignment="Stretch" x:Name="canvas1" Margin="0" VerticalAlignment="Bottom" d:LayoutOverrides="Height"/>
         	<StackPanel Grid.Row="1" Orientation="Horizontal">
         		<Button Content="Play"/>
         		<Button Content="Stop"/>

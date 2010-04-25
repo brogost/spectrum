@@ -94,7 +94,9 @@ namespace spectrum
             result = system.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
             canvas1.channel = channel;
             canvas1.sound = sound;
+            canvas1.SampleRate = 44100;
 
+            canvas1.InitVisuals();
             canvas1.InvalidateVisual();
 
             timer.Tick += new EventHandler(timer_Tick);
@@ -133,26 +135,111 @@ namespace spectrum
 
     public class MyCanvas : Canvas
     {
+
+        private int offset_in_ms = 0;
+        private int scale_factor = 1;
+
+        // the conversion between pixels and time = 1 pixel = 10 ms * scale
+
+        private List<Visual> visuals = new List<Visual>();
+        protected override int VisualChildrenCount { get { return visuals.Count; } }
+        protected override Visual GetVisualChild(int index) { return visuals[index]; }
+
+        private int PixelToMs(int pixel)
+        {
+            return offset_in_ms + pixel * 10 * scale_factor;
+        }
+
+        private int MsToPixel(int ms)
+        {
+            return (ms - offset_in_ms) / (10 * scale_factor);
+        }
+
+        public void AddVisual(Visual visual)
+        {
+            visuals.Add(visual);
+            base.AddVisualChild(visual);
+            base.AddLogicalChild(visual);
+        }
+
+        public void DeleteVisual(Visual visual)
+        {
+            visuals.Remove(visual);
+            base.RemoveVisualChild(visual);
+            base.RemoveLogicalChild(visual);
+        }
+
+        public void RemoveAllVisuals()
+        {
+            foreach (var v in visuals) {
+                base.RemoveVisualChild(v);
+                base.RemoveLogicalChild(v);
+            }
+            visuals.Clear();
+        }
+
+        int MsToIndex(int ms)
+        {
+            return ms * SampleRate / 1000;
+        }
+
+        public void InitVisuals()
+        {
+            RemoveAllVisuals();
+
+            int start_ms = offset_in_ms;
+            int end_ms = PixelToMs((int)(ActualWidth / 96 * dpiX));
+            var prev = new Point(0, Height - Height * left_amp[MsToIndex(start_ms)]);
+            var black_pen = new Pen(Brushes.Black, 1);
+            for (int i = 1; i < ActualWidth; ++i) {
+                float t = i / (float)ActualWidth;
+                int idx = MsToIndex((int)((1 - t) * start_ms + t * end_ms));
+                var cur = new Point(i, Height - Height * left_amp[idx]);
+                var v = new DrawingVisual();
+                using (DrawingContext dc = v.RenderOpen()) {
+                    dc.DrawLine(black_pen, prev, cur);
+                    dc.Close();
+                }
+                AddVisual(v);
+                prev = cur;
+            }
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            if (channel == null) {
+                return;
+            }
+            PresentationSource source = PresentationSource.FromVisual(this);
+
+            if (source != null) {
+                dpiX = 96.0 * source.CompositionTarget.TransformToDevice.M11;
+                dpiY = 96.0 * source.CompositionTarget.TransformToDevice.M22;
+            }
+
+            uint pos = 0;
+            channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
+            if (pos > PixelToMs((int)ActualWidth)) {
+                offset_in_ms = (int)pos;
+                InitVisuals();
+            }
+
+            base.OnRender(dc);
+            var cur_pos = MsToPixel((int)pos);
+            var red_pen = new Pen(Brushes.Red, 1);
+            dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
+        }
+
+        private double dpiX = 96;
+        private double dpiY = 96;
+/*
         protected override void OnRender(DrawingContext dc)
         {
 
             if (left_amp.Count == 0 || sound == null || channel == null) {
                 return;
             }
-/*
-            if (left_amp.Count < ActualWidth) {
-                return;
-            }
 
-            var prev = new Point(0, Height - Height * left_amp[0]);
-            var black_pen = new Pen(Brushes.Black, 1);
-            for (int i = 1; i < ActualWidth; ++i) {
-                int idx = (int)((i / (float)ActualWidth) * left_amp.Count());
-                var cur = new Point(i, Height - Height * left_amp[idx]);
-                dc.DrawLine(black_pen, prev, cur);
-                prev = cur;
-            }
-*/
             uint pos = 0;
             channel.getPosition(ref pos, FMOD.TIMEUNIT.PCMBYTES);
 
@@ -177,12 +264,14 @@ namespace spectrum
             var red_pen = new Pen(Brushes.Red, 1);
             dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
         }
-
+*/
         public float SongPos { get; set; }
         public List<float> left_amp = new List<float>();
         public List<float> right_amp = new List<float>();
         public FMOD.Sound sound = null;
         public FMOD.Channel channel = null;
+
+        public int SampleRate {get; set; }
     }
 
 }
