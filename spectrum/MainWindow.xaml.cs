@@ -81,15 +81,19 @@ namespace spectrum
             var numSamples = totalBytes / (bits / 8 * channels);
             var sampleSize = bits / 8 * channels;
             var cur = 0;
-            byte [] bah = new byte[len1];
-            Marshal.Copy(ptr1, bah, 0, (int)len1);
+            byte [] tmp = new byte[len1];
+            Marshal.Copy(ptr1, tmp, 0, (int)len1);
             for (var i = 0; i < numSamples; ++i) {
-                var s = BitConverter.ToInt16(bah, cur);
-                canvas1.amps.Add(s);
+                float l = (float)BitConverter.ToInt16(tmp, cur) / 65536;
+                float r = (float)BitConverter.ToInt16(tmp, cur + 2) / 65536;
+                canvas1.left_amp.Add(l);
+                canvas1.right_amp.Add(r);
                 cur += sampleSize;
             }
             sound.unlock(ptr1, ptr2, len1, len2);
             result = system.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
+            canvas1.channel = channel;
+            canvas1.sound = sound;
 
             canvas1.InvalidateVisual();
 
@@ -131,27 +135,54 @@ namespace spectrum
     {
         protected override void OnRender(DrawingContext dc)
         {
-            if (amps.Count < ActualWidth) {
+
+            if (left_amp.Count == 0 || sound == null || channel == null) {
+                return;
+            }
+/*
+            if (left_amp.Count < ActualWidth) {
                 return;
             }
 
-            var prev = new Point(0, Height / 2 + Height / 2 * (float)amps[0] / 32768);
+            var prev = new Point(0, Height - Height * left_amp[0]);
             var black_pen = new Pen(Brushes.Black, 1);
-            var red_pen = new Pen(Brushes.Red, 1);
             for (int i = 1; i < ActualWidth; ++i) {
-                int idx = (int)((i / (float)ActualWidth) * amps.Count());
-                var cur = new Point(i, Height / 2 + Height / 2 * (float)amps[idx] / 32768);
+                int idx = (int)((i / (float)ActualWidth) * left_amp.Count());
+                var cur = new Point(i, Height - Height * left_amp[idx]);
+                dc.DrawLine(black_pen, prev, cur);
+                prev = cur;
+            }
+*/
+            uint pos = 0;
+            channel.getPosition(ref pos, FMOD.TIMEUNIT.PCMBYTES);
+
+            uint len = 0;
+            sound.getLength(ref len, FMOD.TIMEUNIT.PCMBYTES);
+
+            long tmp = pos * left_amp.Count / len;
+            int start_idx = (int)(tmp);
+
+            var prev = new Point(0, Height - Height * left_amp[start_idx]);
+            var black_pen = new Pen(Brushes.Black, 1);
+            var j = 0;
+            for (int i = start_idx + 1; i < left_amp.Count && j < ActualWidth; ++i) {
+                var cur = new Point(j, Height - Height * left_amp[i]);
+                j += 10;
                 dc.DrawLine(black_pen, prev, cur);
                 prev = cur;
             }
 
+
             var cur_pos = ActualWidth * SongPos;
+            var red_pen = new Pen(Brushes.Red, 1);
             dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
         }
 
         public float SongPos { get; set; }
-        public List<Int16> amps = new List<Int16>();
-
+        public List<float> left_amp = new List<float>();
+        public List<float> right_amp = new List<float>();
+        public FMOD.Sound sound = null;
+        public FMOD.Channel channel = null;
     }
 
 }
