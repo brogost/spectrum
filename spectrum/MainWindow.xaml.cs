@@ -131,7 +131,6 @@ namespace spectrum
     {
         protected override void OnRender(DrawingContext dc)
         {
-            dc.DrawRectangle(Brushes.LightSalmon, null, new Rect(0, 0, ActualWidth, Height));
             if (amps.Count < ActualWidth) {
                 return;
             }
