@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:spectrum="clr-namespace:spectrum"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="spectrum.MainWindow"
-        Title="MainWindow" Height="648" Width="1005" KeyUp="Window_KeyUp" MouseLeftButtonUp="Window_MouseLeftButtonUp">
+        Title="MainWindow" Height="648" Width="1005" KeyUp="Window_KeyUp" MouseLeftButtonUp="Window_MouseLeftButtonUp" SizeChanged="Window_SizeChanged">
     <Grid Background="#FF393A3F" ShowGridLines="True">
         <Grid.RowDefinitions>
         	<RowDefinition Height="auto"/>
@@ -40,7 +40,7 @@
     			<CheckBox>Right</CheckBox>
 				<TextBox x:Name="Offset">Min</TextBox>
 				<TextBox x:Name="Scale">Max</TextBox>
-				<CheckBox x:Name="AutoScroll" Content="CheckBox"/>
+				<CheckBox x:Name="AutoScroll" Content="AutoScroll"/>
 			</StackPanel>
     	</Grid>
     </Grid>

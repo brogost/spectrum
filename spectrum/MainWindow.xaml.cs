@@ -101,7 +101,7 @@ namespace spectrum
             canvas1.InvalidateVisual();
 
             timer.Tick += new EventHandler(timer_Tick);
-            timer.Interval = TimeSpan.FromMilliseconds(100);
+            timer.Interval = TimeSpan.FromMilliseconds(1000 / 25);
             timer.Start();
         }
 
@@ -162,6 +162,12 @@ namespace spectrum
         private void Window_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             canvas1.Clicked();
+        }
+
+        private void Window_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+        {
+            canvas1.InitVisuals();
+        	// TODO: Add event handler implementation here.
         }
     }
 
@@ -260,26 +266,36 @@ namespace spectrum
 
         public void InitVisuals()
         {
+            if (left_amp.Count == 0) {
+                return;
+            }
+
             RemoveAllVisuals();
 
             uint start_ms = OffsetInMs;
             uint end_ms = PixelToMs(ActualPixelWidth());
-            var prev = new Point(0, Height - Height * left_amp[(int)MsToIndex(start_ms)]);
-            var black_pen = new Pen(Brushes.Black, 1);
+            var left_pen = new Pen(Brushes.YellowGreen, 1);
+            var right_pen = new Pen(Brushes.OrangeRed, 1);
+
+            var left_prev = new Point(0, Height - Height * left_amp[(int)MsToIndex(start_ms)]);
+            var right_prev = new Point(0, Height - Height * right_amp[(int)MsToIndex(start_ms)]);
             for (int i = 1; i < ActualWidth; ++i) {
                 float t = i / (float)ActualWidth;
                 int idx = (int)MsToIndex((uint)((1 - t) * start_ms + t * end_ms));
                 if (idx >= left_amp.Count) {
                     break;
                 }
-                var cur = new Point(i, Height - Height * left_amp[idx]);
+                var left_cur = new Point(i, Height - Height * left_amp[idx]);
+                var right_cur = new Point(i, Height - Height * right_amp[idx]);
                 var v = new DrawingVisual();
                 using (DrawingContext dc = v.RenderOpen()) {
-                    dc.DrawLine(black_pen, prev, cur);
+                    dc.DrawLine(left_pen, left_prev, left_cur);
+                    dc.DrawLine(right_pen, right_prev, right_cur);
                     dc.Close();
                 }
                 AddVisual(v);
-                prev = cur;
+                left_prev = left_cur;
+                right_prev = right_cur;
             }
         }
 
