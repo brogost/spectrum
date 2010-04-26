@@ -24,7 +24,6 @@ namespace spectrum
         public MainWindow()
         {
             InitializeComponent();
-
             var result = FMOD.Factory.System_Create(ref system);
             FmodCheck(result);
 
@@ -95,6 +94,8 @@ namespace spectrum
             canvas1.channel = channel;
             canvas1.sound = sound;
             canvas1.SampleRate = 44100;
+            canvas1.ScaleFactor = 128;
+
 
             canvas1.InitVisuals();
             canvas1.InvalidateVisual();
@@ -112,6 +113,7 @@ namespace spectrum
             sound.getLength(ref len, FMOD.TIMEUNIT.MS);
             canvas1.SongPos = pos / (float)len;
             canvas1.InvalidateVisual();
+            UpdateText();
         }
 
         private System.Windows.Threading.DispatcherTimer timer = new System.Windows.Threading.DispatcherTimer();
@@ -120,39 +122,106 @@ namespace spectrum
         private FMOD.Sound sound = null;
         private FMOD.Channel channel = null;
 
-        private void Redraw_Click(object sender, RoutedEventArgs e)
-        {
-            canvas1.InvalidateVisual();
-        }
-
         private void slider1_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             var v = e.NewValue;
         }
 
+        private void UpdateText()
+        {
+            Scale.Text = canvas1.ScaleFactor.ToString();
+            Offset.Text = canvas1.OffsetInMs.ToString();
 
+        }
+
+        private void Window_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            switch (e.Key) {
+                case Key.Add:
+                    canvas1.ScaleFactor = canvas1.ScaleFactor * 2;
+                    break;
+                case Key.Subtract:
+                    canvas1.ScaleFactor = canvas1.ScaleFactor > 1 ? canvas1.ScaleFactor / 2 : 1;
+                    break;
+                case Key.PageDown:
+                    canvas1.ForwardPage();
+                    break;
+                case Key.PageUp:
+                    canvas1.BackPage();
+                    break;
+                case Key.Space:
+                    bool paused = false;
+                    channel.getPaused(ref paused);
+                    channel.setPaused(!paused);
+                    break;
+            }
+            canvas1.InitVisuals();
+        }
+
+
+        private void Window_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            canvas1.Clicked();
+        }
     }
 
     public class MyCanvas : Canvas
     {
-
-        private int offset_in_ms = 0;
-        private int scale_factor = 1;
-
-        // the conversion between pixels and time = 1 pixel = 10 ms * scale
-
-        private List<Visual> visuals = new List<Visual>();
-        protected override int VisualChildrenCount { get { return visuals.Count; } }
-        protected override Visual GetVisualChild(int index) { return visuals[index]; }
-
-        private int PixelToMs(int pixel)
+        public void Clicked()
         {
-            return offset_in_ms + pixel * 10 * scale_factor;
+            if (channel == null) {
+                return;
+            }
+            var p = Mouse.GetPosition(this);
+            uint ms = PixelToMs((uint)p.X);
+            channel.setPosition(ms, FMOD.TIMEUNIT.MS);
         }
 
-        private int MsToPixel(int ms)
+        private uint PixelToMs(uint pixel)
         {
-            return (ms - offset_in_ms) / (10 * scale_factor);
+            long t = (long)(pixel * ms_per_pixel) * ScaleFactor;
+            return (uint)(OffsetInMs + (t >> 8));
+        }
+
+        private uint DistToMs(uint pixels)
+        {
+            long t = (long)(pixels * ms_per_pixel) * ScaleFactor;
+            return (uint)(t >> 8);
+        }
+
+        public void BackPage()
+        {
+            if (channel == null) {
+                return;
+            }
+            uint ofs = DistToMs(ActualPixelWidth());
+            uint pos = 0;
+            channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
+            uint new_pos = ofs > pos ? 0 : pos - ofs;
+            channel.setPosition(new_pos, FMOD.TIMEUNIT.MS);
+            OffsetInMs = new_pos;
+        }
+
+        public void ForwardPage()
+        {
+            if (channel == null) {
+                return;
+            }
+            uint ofs = DistToMs(ActualPixelWidth());
+            uint pos = 0;
+            uint len = 0;
+            sound.getLength(ref len, FMOD.TIMEUNIT.MS);
+            channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
+            uint new_pos = pos + ofs > len ? len : pos + ofs;
+            channel.setPosition(new_pos, FMOD.TIMEUNIT.MS);
+            OffsetInMs = new_pos;
+        }
+
+        private uint MsToPixel(uint ms)
+        {
+            long num = (ms - OffsetInMs) << 8;
+            long denom = (ms_per_pixel * ScaleFactor);
+            return (uint)(num / denom);
         }
 
         public void AddVisual(Visual visual)
@@ -178,22 +247,31 @@ namespace spectrum
             visuals.Clear();
         }
 
-        int MsToIndex(int ms)
+        uint MsToIndex(uint ms)
         {
-            return ms * SampleRate / 1000;
+            long t = (long)ms * (long)SampleRate / 1000;
+            return (uint)t;
+        }
+
+        uint ActualPixelWidth()
+        {
+            return (uint)(ActualWidth * dpiX / 96);
         }
 
         public void InitVisuals()
         {
             RemoveAllVisuals();
 
-            int start_ms = offset_in_ms;
-            int end_ms = PixelToMs((int)(ActualWidth / 96 * dpiX));
-            var prev = new Point(0, Height - Height * left_amp[MsToIndex(start_ms)]);
+            uint start_ms = OffsetInMs;
+            uint end_ms = PixelToMs(ActualPixelWidth());
+            var prev = new Point(0, Height - Height * left_amp[(int)MsToIndex(start_ms)]);
             var black_pen = new Pen(Brushes.Black, 1);
             for (int i = 1; i < ActualWidth; ++i) {
                 float t = i / (float)ActualWidth;
-                int idx = MsToIndex((int)((1 - t) * start_ms + t * end_ms));
+                int idx = (int)MsToIndex((uint)((1 - t) * start_ms + t * end_ms));
+                if (idx >= left_amp.Count) {
+                    break;
+                }
                 var cur = new Point(i, Height - Height * left_amp[idx]);
                 var v = new DrawingVisual();
                 using (DrawingContext dc = v.RenderOpen()) {
@@ -219,52 +297,20 @@ namespace spectrum
 
             uint pos = 0;
             channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
-            if (pos > PixelToMs((int)ActualWidth)) {
-                offset_in_ms = (int)pos;
+            if (pos > PixelToMs(ActualPixelWidth())) {
+                OffsetInMs = pos;
                 InitVisuals();
             }
 
             base.OnRender(dc);
-            var cur_pos = MsToPixel((int)pos);
+            var cur_pos = MsToPixel(pos);
             var red_pen = new Pen(Brushes.Red, 1);
             dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
         }
 
         private double dpiX = 96;
         private double dpiY = 96;
-/*
-        protected override void OnRender(DrawingContext dc)
-        {
 
-            if (left_amp.Count == 0 || sound == null || channel == null) {
-                return;
-            }
-
-            uint pos = 0;
-            channel.getPosition(ref pos, FMOD.TIMEUNIT.PCMBYTES);
-
-            uint len = 0;
-            sound.getLength(ref len, FMOD.TIMEUNIT.PCMBYTES);
-
-            long tmp = pos * left_amp.Count / len;
-            int start_idx = (int)(tmp);
-
-            var prev = new Point(0, Height - Height * left_amp[start_idx]);
-            var black_pen = new Pen(Brushes.Black, 1);
-            var j = 0;
-            for (int i = start_idx + 1; i < left_amp.Count && j < ActualWidth; ++i) {
-                var cur = new Point(j, Height - Height * left_amp[i]);
-                j += 10;
-                dc.DrawLine(black_pen, prev, cur);
-                prev = cur;
-            }
-
-
-            var cur_pos = ActualWidth * SongPos;
-            var red_pen = new Pen(Brushes.Red, 1);
-            dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
-        }
-*/
         public float SongPos { get; set; }
         public List<float> left_amp = new List<float>();
         public List<float> right_amp = new List<float>();
@@ -272,6 +318,20 @@ namespace spectrum
         public FMOD.Channel channel = null;
 
         public int SampleRate {get; set; }
+
+
+        // in 24.8 fixed point
+        public uint ScaleFactor;
+        private uint scale_factor = 1;
+
+        public uint OffsetInMs { get; set; }
+
+        private uint ms_per_pixel = 1;
+
+        private List<Visual> visuals = new List<Visual>();
+        protected override int VisualChildrenCount { get { return visuals.Count; } }
+        protected override Visual GetVisualChild(int index) { return visuals[index]; }
+
     }
 
 }

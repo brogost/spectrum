@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:spectrum="clr-namespace:spectrum"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="spectrum.MainWindow"
-        Title="MainWindow" Height="648" Width="1005">
+        Title="MainWindow" Height="648" Width="1005" KeyUp="Window_KeyUp" MouseLeftButtonUp="Window_MouseLeftButtonUp">
     <Grid Background="#FF393A3F" ShowGridLines="True">
         <Grid.RowDefinitions>
         	<RowDefinition Height="auto"/>
@@ -20,7 +20,7 @@
     	    	<RowDefinition Height="auto"/>
         		<RowDefinition Height="auto"/>
         	</Grid.RowDefinitions>
-        	<spectrum:MyCanvas Grid.Row="0" Height="500" HorizontalAlignment="Stretch" x:Name="canvas1" Margin="0" VerticalAlignment="Bottom" d:LayoutOverrides="Height"/>
+            <spectrum:MyCanvas Grid.Row="0" Height="500" HorizontalAlignment="Stretch" x:Name="canvas1" Margin="0" VerticalAlignment="Bottom" d:LayoutOverrides="Height" />
         	<StackPanel Grid.Row="1" Orientation="Horizontal">
         		<Button Content="Play"/>
         		<Button Content="Stop"/>
@@ -38,8 +38,9 @@
 			<StackPanel Grid.Row="1" Orientation="Horizontal">
     			<CheckBox>Left</CheckBox>
     			<CheckBox>Right</CheckBox>
-				<TextBox>Min</TextBox>
-				<TextBox>Max</TextBox>
+				<TextBox x:Name="Offset">Min</TextBox>
+				<TextBox x:Name="Scale">Max</TextBox>
+				<CheckBox x:Name="AutoScroll" Content="CheckBox"/>
 			</StackPanel>
     	</Grid>
     </Grid>
