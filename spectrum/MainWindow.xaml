@@ -18,10 +18,10 @@
         <Grid Grid.Row="1">
 	        <Grid.RowDefinitions>
     	    	<RowDefinition Height="auto"/>
-        		<RowDefinition Height="auto"/>
+        		<RowDefinition Height="*"/>
         	</Grid.RowDefinitions>
-            <spectrum:MyCanvas Grid.Row="0" Height="500" HorizontalAlignment="Stretch" x:Name="canvas1" Margin="0" VerticalAlignment="Bottom" d:LayoutOverrides="Height" />
-        	<StackPanel Grid.Row="1" Orientation="Horizontal">
+            <spectrum:MyCanvas Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" x:Name="canvas1" Margin="0" Height="500" />
+        	<StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left">
         		<Button Content="Play"/>
         		<Button Content="Stop"/>
         		<Button Content="Button"/>

@@ -97,7 +97,7 @@ namespace spectrum
             canvas1.ScaleFactor = 128;
 
 
-            canvas1.InitVisuals();
+            canvas1.CreateVisuals();
             canvas1.InvalidateVisual();
 
             timer.Tick += new EventHandler(timer_Tick);
@@ -155,7 +155,7 @@ namespace spectrum
                     channel.setPaused(!paused);
                     break;
             }
-            canvas1.InitVisuals();
+            canvas1.CreateVisuals();
         }
 
 
@@ -166,7 +166,7 @@ namespace spectrum
 
         private void Window_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
         {
-            canvas1.InitVisuals();
+            canvas1.CreateVisuals();
         	// TODO: Add event handler implementation here.
         }
     }
@@ -264,7 +264,7 @@ namespace spectrum
             return (uint)(ActualWidth * dpiX / 96);
         }
 
-        public void InitVisuals()
+        public void CreateVisuals()
         {
             if (left_amp.Count == 0) {
                 return;
@@ -301,9 +301,19 @@ namespace spectrum
 
         protected override void OnRender(DrawingContext dc)
         {
+            dc.DrawRectangle(Brushes.DarkGray, null, new Rect(0,0, ActualWidth, ActualHeight));
             if (channel == null) {
                 return;
             }
+
+            int cSegments = 10;
+            var gray_pen = new Pen(Brushes.AliceBlue, 1);
+            float ofs = (float)(ActualWidth / cSegments);
+            for (int i = 0; i < cSegments; ++i) {
+                dc.DrawLine(gray_pen, new Point(ofs * i, 0), new Point(ofs * i, ActualHeight));
+            }
+
+
             PresentationSource source = PresentationSource.FromVisual(this);
 
             if (source != null) {
@@ -315,7 +325,7 @@ namespace spectrum
             channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
             if (pos > PixelToMs(ActualPixelWidth())) {
                 OffsetInMs = pos;
-                InitVisuals();
+                CreateVisuals();
             }
 
             base.OnRender(dc);
