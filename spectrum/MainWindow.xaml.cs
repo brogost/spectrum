@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Runtime.InteropServices;
+using System.Globalization;
 
 namespace spectrum
 {
@@ -271,11 +272,13 @@ namespace spectrum
             }
 
             RemoveAllVisuals();
-
-            uint start_ms = OffsetInMs;
-            uint end_ms = PixelToMs(ActualPixelWidth());
             var left_pen = new Pen(Brushes.YellowGreen, 1);
             var right_pen = new Pen(Brushes.OrangeRed, 1);
+
+            // create x screens of data to be able to scroll without reloading
+            uint screen_size_in_ms = DistToMs(ActualPixelWidth());
+            uint start_ms = OffsetInMs;
+            uint end_ms = PixelToMs(ActualPixelWidth());
 
             var left_prev = new Point(0, Height - Height * left_amp[(int)MsToIndex(start_ms)]);
             var right_prev = new Point(0, Height - Height * right_amp[(int)MsToIndex(start_ms)]);
@@ -285,10 +288,13 @@ namespace spectrum
                 if (idx >= left_amp.Count) {
                     break;
                 }
+
+               
                 var left_cur = new Point(i, Height - Height * left_amp[idx]);
                 var right_cur = new Point(i, Height - Height * right_amp[idx]);
                 var v = new DrawingVisual();
                 using (DrawingContext dc = v.RenderOpen()) {
+                    uint cur_ms = PixelToMs((uint)i);
                     dc.DrawLine(left_pen, left_prev, left_cur);
                     dc.DrawLine(right_pen, right_prev, right_cur);
                     dc.Close();
@@ -306,11 +312,18 @@ namespace spectrum
                 return;
             }
 
+            var culture = CultureInfo.GetCultureInfo("en-us");
+            var typeface = new Typeface("Verdana");
+
             int cSegments = 10;
             var gray_pen = new Pen(Brushes.AliceBlue, 1);
             float ofs = (float)(ActualWidth / cSegments);
             for (int i = 0; i < cSegments; ++i) {
-                dc.DrawLine(gray_pen, new Point(ofs * i, 0), new Point(ofs * i, ActualHeight));
+                var cur_x = ofs * i;
+                var top = new Point(cur_x, ActualHeight);
+                var bottom = new Point(cur_x, 0);
+                dc.DrawLine(gray_pen, top, bottom);
+                dc.DrawText(new FormattedText(String.Format("{0} ms", PixelToMs((uint)cur_x)), culture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black), new Point(cur_x, 100));
             }
 
 
@@ -348,9 +361,8 @@ namespace spectrum
 
         // in 24.8 fixed point
         public uint ScaleFactor;
-        private uint scale_factor = 1;
-
         public uint OffsetInMs { get; set; }
+        public uint ScrollOffset { get; set; }
 
         private uint ms_per_pixel = 1;
 
