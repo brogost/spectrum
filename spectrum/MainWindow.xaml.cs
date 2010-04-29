@@ -92,6 +92,7 @@ namespace spectrum
             }
             sound.unlock(ptr1, ptr2, len1, len2);
             result = system.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
+            channel.setVolume(0);
             canvas1.channel = channel;
             canvas1.sound = sound;
             canvas1.SampleRate = 44100;
@@ -226,7 +227,7 @@ namespace spectrum
 
         private uint MsToPixel(uint ms)
         {
-            long num = (ms - OffsetInMs) << 8;
+            long num = (long)(ms - OffsetInMs) << 8;
             long denom = (ms_per_pixel * ScaleFactor);
             return (uint)(num / denom);
         }
@@ -265,6 +266,43 @@ namespace spectrum
             return (uint)(ActualWidth * dpiX / 96);
         }
 
+        // generate tick marks at nice intervals, using "Nice Numbers For Graph Labels" in Graphic Gems
+        private void generate_nice_ticks(float min_value, float max_value, int num_ticks, out List<float> ticks)
+        {
+            var range = nice_num(max_value - min_value, false);
+            var d = nice_num(range / (num_ticks - 1), true);
+            var graph_min = Math.Floor(min_value / d) * d;
+            var graph_max = Math.Ceiling(max_value / d) * d;
+            var nfrac = Math.Max(-Math.Floor(Math.Log10(d)), 0);
+            ticks = new List<float>();
+            ticks.Clear();
+            var x = graph_min;
+            while (x <= graph_max + 0.5 * d) {
+                ticks.Add((float)x);
+                x += d;
+            }
+        }
+
+        private float nice_num(float x, bool round)
+        {
+            var e = Math.Floor(Math.Log10(x));
+            var f = x / Math.Pow(10, e);
+            float nf;
+            if (round) {
+                if (f < 1.5) nf = 1;
+                else if (f < 3) nf = 2;
+                else if (f < 7) nf = 5;
+                else nf = 10;
+            } else {
+                if (f <= 1) nf = 1;
+                else if (f <= 2) nf = 2;
+                else if (f <= 5) nf = 5;
+                else nf = 10;
+            }
+
+            return (float)(nf * Math.Pow(10, e));
+        }
+
         public void CreateVisuals()
         {
             if (left_amp.Count == 0) {
@@ -275,7 +313,6 @@ namespace spectrum
             var left_pen = new Pen(Brushes.YellowGreen, 1);
             var right_pen = new Pen(Brushes.OrangeRed, 1);
 
-            // create x screens of data to be able to scroll without reloading
             uint screen_size_in_ms = DistToMs(ActualPixelWidth());
             uint start_ms = OffsetInMs;
             uint end_ms = PixelToMs(ActualPixelWidth());
@@ -315,17 +352,18 @@ namespace spectrum
             var culture = CultureInfo.GetCultureInfo("en-us");
             var typeface = new Typeface("Verdana");
 
-            int cSegments = 10;
+            // create x screens of data to be able to scroll without reloading
+            List<float> ticks;
+            generate_nice_ticks(PixelToMs(0), PixelToMs(ActualPixelWidth()), 10, out ticks);
+
             var gray_pen = new Pen(Brushes.AliceBlue, 1);
-            float ofs = (float)(ActualWidth / cSegments);
-            for (int i = 0; i < cSegments; ++i) {
-                var cur_x = ofs * i;
+            foreach (var t in ticks) {
+                var cur_x = MsToPixel((uint)t);
                 var top = new Point(cur_x, ActualHeight);
                 var bottom = new Point(cur_x, 0);
                 dc.DrawLine(gray_pen, top, bottom);
-                dc.DrawText(new FormattedText(String.Format("{0} ms", PixelToMs((uint)cur_x)), culture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black), new Point(cur_x, 100));
+                dc.DrawText(new FormattedText(String.Format("{0}s", t/1000), culture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black), new Point(cur_x, 100));
             }
-
 
             PresentationSource source = PresentationSource.FromVisual(this);
 
