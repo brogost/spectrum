@@ -84,16 +84,13 @@ namespace spectrum
             byte [] tmp = new byte[len1];
             Marshal.Copy(ptr1, tmp, 0, (int)len1);
             for (var i = 0; i < numSamples; ++i) {
-                float l = (float)BitConverter.ToInt16(tmp, cur) / 65536;
-                float r = (float)BitConverter.ToInt16(tmp, cur + 2) / 65536;
+                float l = (float)BitConverter.ToInt16(tmp, cur) / 32768;
+                float r = (float)BitConverter.ToInt16(tmp, cur + 2) / 32768;
                 canvas1.left_amp.Add(l);
                 canvas1.right_amp.Add(r);
                 cur += sampleSize;
             }
             sound.unlock(ptr1, ptr2, len1, len2);
-            result = system.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
-            channel.setVolume(0);
-            canvas1.channel = channel;
             canvas1.sound = sound;
             canvas1.SampleRate = 44100;
             canvas1.ScaleFactor = 128;
@@ -109,6 +106,9 @@ namespace spectrum
 
         void timer_Tick(object sender, EventArgs e)
         {
+            if (channel == null) {
+                return;
+            }
             uint pos = 0;
             uint len = 0;
             channel.getPosition(ref pos, FMOD.TIMEUNIT.MS);
@@ -140,10 +140,10 @@ namespace spectrum
         {
             switch (e.Key) {
                 case Key.Add:
-                    canvas1.ScaleFactor = canvas1.ScaleFactor * 2;
+                    canvas1.ScaleFactor = canvas1.ScaleFactor > 1 ? canvas1.ScaleFactor / 2 : 1;
                     break;
                 case Key.Subtract:
-                    canvas1.ScaleFactor = canvas1.ScaleFactor > 1 ? canvas1.ScaleFactor / 2 : 1;
+                    canvas1.ScaleFactor = canvas1.ScaleFactor * 2;
                     break;
                 case Key.PageDown:
                     canvas1.ForwardPage();
@@ -153,8 +153,15 @@ namespace spectrum
                     break;
                 case Key.Space:
                     bool paused = false;
-                    channel.getPaused(ref paused);
-                    channel.setPaused(!paused);
+                    if (channel == null) {
+                        start_playing();
+                    } else {
+                        channel.getPaused(ref paused);
+                        channel.setPaused(!paused);
+                    }
+                    break;
+                case Key.Right:
+                    canvas1.Right();
                     break;
             }
             canvas1.CreateVisuals();
@@ -171,6 +178,39 @@ namespace spectrum
             canvas1.CreateVisuals();
         	// TODO: Add event handler implementation here.
         }
+
+        private void Play_Click(object sender, RoutedEventArgs e)
+        {
+            start_playing();
+        }
+
+        private void Stop_Click(object sender, RoutedEventArgs e)
+        {
+            if (channel == null) {
+                return;
+            }
+
+            channel.stop();
+        }
+
+        private void start_playing()
+        {
+            var result = system.playSound(FMOD.CHANNELINDEX.FREE, sound, false, ref channel);
+            canvas1.channel = channel;
+            channel.setVolume(0);
+        }
+
+        private void LeftCheck_Checked(object sender, RoutedEventArgs e)
+        {
+            canvas1.DisplayLeft = (bool)LeftCheck.IsChecked;
+            canvas1.CreateVisuals();
+        }
+
+        private void RightCheck_Checked(object sender, RoutedEventArgs e)
+        {
+            canvas1.DisplayRight = (bool)RightCheck.IsChecked;
+            canvas1.CreateVisuals();
+        }
     }
 
     public class MyCanvas : Canvas
@@ -183,6 +223,11 @@ namespace spectrum
             var p = Mouse.GetPosition(this);
             uint ms = PixelToMs((uint)p.X);
             channel.setPosition(ms, FMOD.TIMEUNIT.MS);
+        }
+
+        public void Right()
+        {
+
         }
 
         private uint PixelToMs(uint pixel)
@@ -303,6 +348,11 @@ namespace spectrum
             return (float)(nf * Math.Pow(10, e));
         }
 
+        private float amp_to_pixel(float v)
+        {
+            return (float)(Height / 2 - Height/2 * v);
+        }
+
         public void CreateVisuals()
         {
             if (left_amp.Count == 0) {
@@ -317,23 +367,27 @@ namespace spectrum
             uint start_ms = OffsetInMs;
             uint end_ms = PixelToMs(ActualPixelWidth());
 
-            var left_prev = new Point(0, Height - Height * left_amp[(int)MsToIndex(start_ms)]);
-            var right_prev = new Point(0, Height - Height * right_amp[(int)MsToIndex(start_ms)]);
+            var idx = (int)MsToIndex(start_ms);
+            var left_prev = new Point(0, amp_to_pixel(left_amp[idx]));
+            var right_prev = new Point(0, amp_to_pixel(right_amp[idx]));
             for (int i = 1; i < ActualWidth; ++i) {
                 float t = i / (float)ActualWidth;
-                int idx = (int)MsToIndex((uint)((1 - t) * start_ms + t * end_ms));
+                idx = (int)MsToIndex((uint)((1 - t) * start_ms + t * end_ms));
                 if (idx >= left_amp.Count) {
                     break;
                 }
-
                
-                var left_cur = new Point(i, Height - Height * left_amp[idx]);
-                var right_cur = new Point(i, Height - Height * right_amp[idx]);
+                var left_cur = new Point(i, amp_to_pixel(left_amp[idx]));
+                var right_cur = new Point(i, amp_to_pixel(right_amp[idx]));
                 var v = new DrawingVisual();
                 using (DrawingContext dc = v.RenderOpen()) {
                     uint cur_ms = PixelToMs((uint)i);
-                    dc.DrawLine(left_pen, left_prev, left_cur);
-                    dc.DrawLine(right_pen, right_prev, right_cur);
+                    if (DisplayLeft) {
+                        dc.DrawLine(left_pen, left_prev, left_cur);
+                    }
+                    if (DisplayRight) {
+                        dc.DrawLine(right_pen, right_prev, right_cur);
+                    }
                     dc.Close();
                 }
                 AddVisual(v);
@@ -345,9 +399,6 @@ namespace spectrum
         protected override void OnRender(DrawingContext dc)
         {
             dc.DrawRectangle(Brushes.DarkGray, null, new Rect(0,0, ActualWidth, ActualHeight));
-            if (channel == null) {
-                return;
-            }
 
             var culture = CultureInfo.GetCultureInfo("en-us");
             var typeface = new Typeface("Verdana");
@@ -362,7 +413,7 @@ namespace spectrum
                 var top = new Point(cur_x, ActualHeight);
                 var bottom = new Point(cur_x, 0);
                 dc.DrawLine(gray_pen, top, bottom);
-                dc.DrawText(new FormattedText(String.Format("{0}s", t/1000), culture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black), new Point(cur_x, 100));
+                dc.DrawText(new FormattedText(String.Format("{0:F2}s", t/1000), culture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black), new Point(cur_x + 10, 20));
             }
 
             PresentationSource source = PresentationSource.FromVisual(this);
@@ -370,6 +421,10 @@ namespace spectrum
             if (source != null) {
                 dpiX = 96.0 * source.CompositionTarget.TransformToDevice.M11;
                 dpiY = 96.0 * source.CompositionTarget.TransformToDevice.M22;
+            }
+
+            if (channel == null) {
+                return;
             }
 
             uint pos = 0;
@@ -385,11 +440,14 @@ namespace spectrum
             dc.DrawLine(red_pen, new Point(cur_pos, 0), new Point(cur_pos, Height));
         }
 
+        public bool DisplayLeft { get; set; }
+        public bool DisplayRight { get; set; }
+
         private double dpiX = 96;
         private double dpiY = 96;
 
         public float SongPos { get; set; }
-        public List<float> left_amp = new List<float>();
+        public List<float> left_amp = new List<float>();        // in the range [-1..1]
         public List<float> right_amp = new List<float>();
         public FMOD.Sound sound = null;
         public FMOD.Channel channel = null;
@@ -407,6 +465,7 @@ namespace spectrum
         private List<Visual> visuals = new List<Visual>();
         protected override int VisualChildrenCount { get { return visuals.Count; } }
         protected override Visual GetVisualChild(int index) { return visuals[index]; }
+
 
     }
 

@@ -22,8 +22,8 @@
         	</Grid.RowDefinitions>
             <spectrum:MyCanvas Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" x:Name="canvas1" Margin="0" Height="500" />
         	<StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-        		<Button Content="Play"/>
-        		<Button Content="Stop"/>
+        		<Button x:Name="Play" Content="Play" Click="Play_Click" />
+        		<Button x:Name="Stop" Content="Stop" Click="Stop_Click" />
         		<Button Content="Button"/>
         		<Label Content="Status:"/>
         		<TextBox x:Name="statusBox" TextWrapping="Wrap" Text="TextBox"/> 
@@ -36,8 +36,8 @@
         	</Grid.RowDefinitions>
     		<Slider Grid.Row="0" Margin="0" x:Name="slider1" ValueChanged="slider1_ValueChanged" Maximum="100" Height="20" VerticalAlignment="Top" />
 			<StackPanel Grid.Row="1" Orientation="Horizontal">
-    			<CheckBox>Left</CheckBox>
-    			<CheckBox>Right</CheckBox>
+    			<CheckBox x:Name="LeftCheck" Checked="LeftCheck_Checked">Left</CheckBox>
+    			<CheckBox x:Name="RightCheck" Checked="RightCheck_Checked">Right</CheckBox>
 				<TextBox x:Name="Offset">Min</TextBox>
 				<TextBox x:Name="Scale">Max</TextBox>
 				<CheckBox x:Name="AutoScroll" Content="AutoScroll"/>
