@@ -5,14 +5,32 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "spectrum", "spectrum\spectr
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|Mixed Platforms = Debug|Mixed Platforms
 		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|Mixed Platforms = Release|Mixed Platforms
 		Release|x86 = Release|x86
+		ReleaseXBAP|Any CPU = ReleaseXBAP|Any CPU
+		ReleaseXBAP|Mixed Platforms = ReleaseXBAP|Mixed Platforms
+		ReleaseXBAP|x86 = ReleaseXBAP|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Debug|Mixed Platforms.Build.0 = Debug|x86
 		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Debug|x86.ActiveCfg = Debug|x86
 		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Debug|x86.Build.0 = Debug|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Release|Any CPU.ActiveCfg = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Release|Mixed Platforms.Build.0 = Release|x86
 		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Release|x86.ActiveCfg = Release|x86
 		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.Release|x86.Build.0 = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.ReleaseXBAP|Any CPU.ActiveCfg = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.ReleaseXBAP|Mixed Platforms.ActiveCfg = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.ReleaseXBAP|Mixed Platforms.Build.0 = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.ReleaseXBAP|x86.ActiveCfg = Release|x86
+		{3B02A0A6-1F07-4EE4-81DF-7B1DB3A879EF}.ReleaseXBAP|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
