@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Threading;
 using System.IO;
 using System.Reflection;
+using System.Windows.Interop;
 
 namespace spectrum
 {
@@ -25,12 +26,6 @@ namespace spectrum
     /// </summary>
     public partial class MainWindow : Window
     {
-
-        internal static class NativeMethods
-        {
-            [DllImport("HostedDx.dll")]
-            public static extern int funky_test();
-        }
 
         public MainWindow()
         {
@@ -274,9 +269,10 @@ namespace spectrum
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            int a = NativeMethods.funky_test();
-            //var l = AdornerLayer.GetAdornerLayer(canvas1);
-            //l.Add(new SimpleCircleAdorner(canvas1));
+            var h = new DxHost();
+            h.CanvasWidth = (int)HostPlaceholder.ActualWidth;
+            h.CanvasHeight = (int)HostPlaceholder.ActualHeight;
+            HostPlaceholder.Child = h;
         }
 
         private void Canvas_Loaded(object sender, RoutedEventArgs e)
@@ -312,6 +308,35 @@ namespace spectrum
 
         public int CurSongPos { get; set; }
         public float CutOffValue { get; set; }
+    }
+
+    internal static class NativeMethods
+    {
+        [DllImport("HostedDx.dll", CharSet = CharSet.Unicode)]
+        public static extern int funky_test();
+
+        [DllImport("HostedDx.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr create_d3d(int width, int height, IntPtr parent);
+
+        [DllImport("HostedDx.dll", CharSet = CharSet.Unicode)]
+        public static extern void destroy_d3d();
+    }
+
+    public class DxHost : HwndHost
+    {
+        protected override HandleRef BuildWindowCore(HandleRef hwndParent)
+        {
+            IntPtr h = NativeMethods.create_d3d(CanvasWidth, CanvasHeight, hwndParent.Handle);
+            return new HandleRef(this, h);
+        }
+
+        protected override void DestroyWindowCore(HandleRef hwnd)
+        {
+            NativeMethods.destroy_d3d();
+        }
+
+        public int CanvasWidth { get; set; }
+        public int CanvasHeight { get; set; }
     }
 
     public class MyCanvas : Canvas

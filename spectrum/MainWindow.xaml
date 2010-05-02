@@ -22,9 +22,7 @@
     	    	<RowDefinition Height="auto"/>
         		<RowDefinition Height="*"/>
         	</Grid.RowDefinitions>
-            <spectrum:MyCanvas Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" x:Name="canvas1" Margin="0" Height="500" Loaded="Canvas_Loaded"/>
-            <Rectangle x:Name="SongPos" Margin="176.336,0,0,0" Fill="#FFFFDE00" Height="500" Stroke="Black" Width="20" HorizontalAlignment="Left">
-            </Rectangle>
+            <spectrum:MyCanvas Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" x:Name="canvas1" Margin="0" Height="1" Loaded="Canvas_Loaded"/>
             <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left">
         		<Button x:Name="Play" Content="Play" Click="Play_Click" />
         		<Button x:Name="Stop" Content="Stop" Click="Stop_Click" />
@@ -32,6 +30,7 @@
         		<Label Content="Status:"/>
         		<TextBox x:Name="statusBox" TextWrapping="Wrap" Text="TextBox"/> 
 			</StackPanel>
+            <Border x:Name="HostPlaceholder" BorderBrush="Black" BorderThickness="1" Margin="0" Grid.Row="1"/>
         </Grid>
     	<Grid Grid.Row="2">
 	        <Grid.RowDefinitions>
