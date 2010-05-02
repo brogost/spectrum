@@ -25,6 +25,13 @@ namespace spectrum
     /// </summary>
     public partial class MainWindow : Window
     {
+
+        internal static class NativeMethods
+        {
+            [DllImport("HostedDx.dll")]
+            public static extern int funky_test();
+        }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -267,6 +274,7 @@ namespace spectrum
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            int a = NativeMethods.funky_test();
             //var l = AdornerLayer.GetAdornerLayer(canvas1);
             //l.Add(new SimpleCircleAdorner(canvas1));
         }
