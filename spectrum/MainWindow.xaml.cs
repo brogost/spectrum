@@ -285,10 +285,24 @@ namespace spectrum
         {
             var f = CutOffValue;
             canvas1.create_cutoffs(f);
+            var h = new HashSet<uint>();
+            foreach (var i in canvas1.left_cut_off_indices) {
+                h.Add(canvas1.IndextoMs((uint)i));
+            }
+            var s = new StreamWriter("time.hpp");
+            uint prev = 0;
+            s.WriteLine("#pragma once");
+            s.WriteLine("int timestamps[] = {");
+            foreach (var i in h) {
+                if (i - prev > 100)
+                    s.WriteLine("{0},", i);
+                prev = i;
+            }
+            s.WriteLine("};");
+            s.Close();
         }
 
         public int CurSongPos { get; set; }
-
         public float CutOffValue { get; set; }
     }
 
@@ -404,13 +418,19 @@ namespace spectrum
             //InvalidateVisual();
         }
 
-        uint MsToIndex(uint ms)
+        public uint MsToIndex(uint ms)
         {
             long t = (long)ms * (long)SampleRate / 1000;
             return (uint)t;
         }
 
-        uint ActualPixelWidth()
+        public uint IndextoMs(uint index)
+        {
+            long t = 1000 * (long)index / SampleRate;
+            return (uint)t;
+        }
+
+        public uint ActualPixelWidth()
         {
             return (uint)(ActualWidth * DpiX / 96);
         }
@@ -570,8 +590,8 @@ namespace spectrum
 
         public float SongPos { get; set; }
 
-        private HashSet<int> left_cut_off_indices = new HashSet<int>();
-        private HashSet<int> right_cut_off_indices = new HashSet<int>();
+        public HashSet<int> left_cut_off_indices = new HashSet<int>();
+        public HashSet<int> right_cut_off_indices = new HashSet<int>();
         public List<float> left_amp = new List<float>();    // in the range [-1..1]
         public List<float> right_amp = new List<float>();
         public FMOD.Sound sound = null;
