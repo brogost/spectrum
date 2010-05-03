@@ -107,11 +107,19 @@ namespace spectrum
         {
             var dlg = new Microsoft.Win32.OpenFileDialog();
             dlg.DefaultExt = "mp3";
-            if (dlg.ShowDialog() == null) {
+            if (dlg.ShowDialog() == null)
                 return;
-            }
 
             var filename = dlg.FileName;
+
+            if (!File.Exists(filename))
+                return;
+
+            if (!NativeMethods.load_mp3(filename))
+                return;
+
+
+
             var result = system.createSound(filename, FMOD.MODE.SOFTWARE | FMOD.MODE._2D, ref sound);
             //var result = system.createStream(filename, FMOD.MODE.SOFTWARE | FMOD.MODE._2D, ref sound);
             FmodCheck(result);
@@ -320,6 +328,10 @@ namespace spectrum
 
         [DllImport("HostedDx.dll", CharSet = CharSet.Unicode)]
         public static extern void destroy_d3d();
+
+        [DllImport("HostedDx.dll", CharSet = CharSet.Unicode)]
+        public static extern bool load_mp3([MarshalAs(UnmanagedType.LPWStr)]String s);
+
     }
 
     public class DxHost : HwndHost
