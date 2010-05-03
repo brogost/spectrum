@@ -19,26 +19,25 @@
         </Menu>
         <Grid Grid.Row="1">
 	        <Grid.RowDefinitions>
-    	    	<RowDefinition Height="auto"/>
-        		<RowDefinition Height="*"/>
+    	    	<RowDefinition Height="*"/>
         	</Grid.RowDefinitions>
-            <spectrum:MyCanvas Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" x:Name="canvas1" Margin="0" Height="1" Loaded="Canvas_Loaded"/>
-            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-        		<Button x:Name="Play" Content="Play" Click="Play_Click" />
-        		<Button x:Name="Stop" Content="Stop" Click="Stop_Click" />
-        		<Button Content="Button"/>
-        		<Label Content="Status:"/>
-        		<TextBox x:Name="statusBox" TextWrapping="Wrap" Text="TextBox"/> 
-			</StackPanel>
             <Border x:Name="HostPlaceholder" BorderBrush="Black" BorderThickness="1" Margin="0" Grid.Row="1"/>
         </Grid>
     	<Grid Grid.Row="2">
 	        <Grid.RowDefinitions>
     	    	<RowDefinition Height="*"/>
-        		<RowDefinition Height="*"/>
-        	</Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
     		<Slider Grid.Row="0" Margin="0" x:Name="slider1" ValueChanged="slider1_ValueChanged" Maximum="100" Height="20" VerticalAlignment="Top" />
-			<StackPanel Grid.Row="1" Orientation="Horizontal">
+            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+                <Button x:Name="Play" Content="Play" Click="Play_Click" />
+                <Button x:Name="Stop" Content="Stop" Click="Stop_Click" />
+                <Button Content="Button"/>
+                <Label Content="Status:"/>
+                <TextBox x:Name="statusBox" TextWrapping="Wrap" Text="TextBox"/>
+            </StackPanel>
+            <StackPanel Grid.Row="2" Orientation="Horizontal">
     			<CheckBox x:Name="LeftCheck" Checked="LeftCheck_Checked" IsChecked="True" Margin="10,0" VerticalAlignment="Center">Left</CheckBox>
     			<CheckBox x:Name="RightCheck" Checked="RightCheck_Checked" IsChecked="True" Margin="10,0" VerticalAlignment="Center">Right</CheckBox>
 				<TextBox x:Name="Offset">Min</TextBox>

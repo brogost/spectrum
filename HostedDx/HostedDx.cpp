@@ -9,6 +9,19 @@
 #include <atlbase.h>
 #include <string>
 #include <fmod.hpp>
+#include <boost/any.hpp>
+
+struct Command
+{
+  Command() {}
+  Command(const std::string& cmd, const boost::any& param = 0) : _cmd(cmd), _param(param) {}
+  std::string _cmd;
+  boost::any _param;
+};
+
+const char *kCmdLoadMp3 = "load_mp3";
+const char *kCmdStartMp3 = "start_mp3";
+const char *kCmdPauseMp3 = "pause_mp3";
 
 class FmodWrapper
 {
@@ -19,6 +32,11 @@ public:
 	bool init();
 
 	bool load(const TCHAR *filename);
+
+  void start();
+  void stop();
+  bool get_paused();
+  void pause(const bool state);
 
 	uint32_t sample_rate() const { return _sample_rate; }
 	int	bits() const { return _bits; }
@@ -63,6 +81,44 @@ FmodWrapper& FmodWrapper::instance()
 	if (_instance == NULL)
 		_instance = new FmodWrapper();
 	return *_instance;
+}
+
+void FmodWrapper::start()
+{
+  // TODO: unload old
+  if (_channel)
+    return;
+
+  if (!_sound)
+    return;
+
+  _fmod_system->playSound(FMOD_CHANNEL_FREE, _sound, false, &_channel);
+}
+
+void FmodWrapper::stop()
+{
+  if (!_channel)
+    return;
+
+  _channel->stop();
+}
+
+bool FmodWrapper::get_paused()
+{
+  if (!_channel)
+    return false;
+
+  bool res; 
+  _channel->getPaused(&res);
+  return res;
+}
+
+void FmodWrapper::pause(const bool state)
+{
+  if (!_channel)
+    return;
+
+  _channel->setPaused(state);
 }
 
 bool FmodWrapper::load(const TCHAR *filename)
@@ -137,6 +193,27 @@ struct DXWrapper
 		int height;
 	};
 
+  bool process_command(const Command& cmd)
+  {
+    if (cmd._cmd == kCmdLoadMp3) {
+      if (!load_mp3(boost::any_cast<std::wstring>(cmd._param).c_str()))
+        return false;
+    } else if (cmd._cmd == kCmdStartMp3) {
+
+    } else if (cmd._cmd == kCmdPauseMp3) {
+
+    }
+    return true;
+  }
+
+  void report_error(const std::string& str)
+  {
+  }
+
+  void add_command(const Command& cmd)
+  {
+    _command_queue.push(cmd);
+  }
 
 	static DWORD WINAPI d3d_thread(void *params)
 	{
@@ -148,14 +225,12 @@ struct DXWrapper
 
 		while (true) {
 
-			std::wstring str;
-			if (wrapper->_mp3_queue.try_pop(str)) {
-				if (!wrapper->load_mp3(str.c_str())) {
-					// signal error somehow..
-				}
-				while (wrapper->_mp3_queue.try_pop(str))
-					;
-			}
+      // process any commands
+      Command cmd;
+      while (wrapper->_command_queue.try_pop(cmd)) {
+        if (!wrapper->process_command(cmd))
+          wrapper->report_error("error running cmd");
+      }
 
 			D3DXCOLOR c(1, 0, 1, 0);
 			wrapper->_immediate_context->ClearRenderTargetView(wrapper->_render_target_view, c);
@@ -253,7 +328,7 @@ struct DXWrapper
 	ThreadParams _params;
 	DWORD _thread_id;
 
-	Concurrency::concurrent_queue<std::wstring>	_mp3_queue;
+	Concurrency::concurrent_queue<Command>	_command_queue;
 
 	D3D11_VIEWPORT _viewport;
 	DXGI_FORMAT _buffer_format;
@@ -320,28 +395,31 @@ extern "C"
 		if (!DXWrapper::is_created())
 			return false;
 
-		DXWrapper::instance()._mp3_queue.push(filename);
+    DXWrapper::instance().add_command(Command(kCmdLoadMp3, std::wstring(filename)));
 
 		return true;
 	}
 
 	HOST_EXPORT bool __stdcall start_mp3()
 	{
+    FmodWrapper::instance().start();
 		return true;
 	}
 
 	HOST_EXPORT bool __stdcall stop_mp3()
 	{
+    FmodWrapper::instance().stop();
 		return true;
 	}
 
 	HOST_EXPORT bool __stdcall get_paused()
 	{
-		return true;
+    return FmodWrapper::instance().get_paused();
 	}
 
 	HOST_EXPORT bool __stdcall set_paused(bool value)
 	{
+    FmodWrapper::instance().pause(value);
 		return true;
 	}
 
