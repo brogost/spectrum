@@ -2,14 +2,8 @@
 //
 
 #include "stdafx.h"
-#include <concurrent_queue.h>
-#include <stdint.h>
-#include <d3d11.h>
-#include <d3dx10.h>
-#include <atlbase.h>
-#include <string>
-#include <fmod.hpp>
-#include <boost/any.hpp>
+#include "graphics.hpp"
+#include "effect_wrapper.hpp"
 
 struct Command
 {
@@ -22,6 +16,8 @@ struct Command
 const char *kCmdLoadMp3 = "load_mp3";
 const char *kCmdStartMp3 = "start_mp3";
 const char *kCmdPauseMp3 = "pause_mp3";
+const char *kCmdIncLod = "inc_lod";
+const char *kCmdDecLod = "dec_lod";
 
 class FmodWrapper
 {
@@ -43,6 +39,8 @@ public:
 	int	channels() const { return _channels; }
 	uint32_t num_samples() const { return _num_samples; }
 	uint8_t*	samples() const { return _samples; }
+
+	uint32_t pos_in_ms();
 
 private:
 
@@ -81,6 +79,16 @@ FmodWrapper& FmodWrapper::instance()
 	if (_instance == NULL)
 		_instance = new FmodWrapper();
 	return *_instance;
+}
+
+uint32_t FmodWrapper::pos_in_ms()
+{
+	if (!_channel)
+		return 0;
+
+	uint32_t pos;
+	_channel->getPosition(&pos, FMOD_TIMEUNIT_MS);
+	return pos;
 }
 
 void FmodWrapper::start()
@@ -169,6 +177,15 @@ bool FmodWrapper::init()
 
 FmodWrapper *FmodWrapper::_instance = NULL;
 
+struct Lod
+{
+	Lod() : _vertex_count(0), _stride(0) {}
+	uint32_t	_vertex_count;
+	uint32_t	_stride;
+	CComPtr<ID3D11Buffer>	_vb_left;
+	CComPtr<ID3D11Buffer>	_vb_right;
+};
+
 struct DXWrapper
 {
 	static DXWrapper *_instance;
@@ -183,6 +200,8 @@ struct DXWrapper
 	}
 
 	DXWrapper()
+		: _loaded(false)
+		, _cur_lod(0)
 	{
 	}
 
@@ -202,7 +221,12 @@ struct DXWrapper
 
     } else if (cmd._cmd == kCmdPauseMp3) {
 
-    }
+    } else if (cmd._cmd == kCmdIncLod) {
+			_cur_lod = std::min<int>(_cur_lod + 1, _lods.size() - 1);
+		} else if (cmd._cmd == kCmdDecLod) {
+			_cur_lod = std::max<int>(_cur_lod - 1, 0);
+		}
+
     return true;
   }
 
@@ -215,27 +239,63 @@ struct DXWrapper
     _command_queue.push(cmd);
   }
 
+	void tick()
+	{
+
+		Graphics& g = Graphics::instance();
+		ID3D11DeviceContext *context = g.context();
+
+		// process any commands
+		Command cmd;
+		while (_command_queue.try_pop(cmd)) {
+			if (!process_command(cmd))
+				report_error("error running cmd");
+		}
+
+		D3DXCOLOR c(0.1f, 0.1f, 0.1f, 0);
+		g.clear(c);
+
+		if (_loaded) {
+			context->VSSetShader(_vs.vertex_shader(), NULL, 0);
+			context->PSSetShader(_ps.pixel_shader(), NULL, 0);
+			context->GSSetShader(NULL, NULL, 0);
+
+			context->IASetInputLayout(_layout);
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+
+			D3DXMATRIX mtx;
+			D3DXMatrixIdentity(&mtx);
+
+			uint32_t ms = FmodWrapper::instance().pos_in_ms();
+			D3DXMatrixTranslation(&mtx, -(ms / 10000.0f), 0, 0);
+			D3DXMatrixTranspose(&mtx, &mtx);
+			_vs.set_variable("mtx", mtx);
+			_vs.unmap_buffers();
+			_vs.set_cbuffer();
+
+			UINT ofs = 0;
+			UINT strides = sizeof(D3DXVECTOR3);
+			const Lod& cur = _lods[_cur_lod];
+			ID3D11Buffer* bufs[] = { cur._vb_left };
+			context->IASetVertexBuffers(0, 1, &bufs[0], &strides, &ofs);
+
+			context->Draw(cur._vertex_count, 0);
+		}
+		g.present();
+	}
+
 	static DWORD WINAPI d3d_thread(void *params)
 	{
 		DXWrapper *wrapper = (DXWrapper *)params;
 		ThreadParams *p = &wrapper->_params;
 
-		if (!wrapper->init_directx(p->hwnd, p->width, p->height))
+		Graphics& g = Graphics::instance();
+
+		if (!g.init_directx(p->hwnd, p->width, p->height))
 			return NULL;
 
 		while (true) {
-
-      // process any commands
-      Command cmd;
-      while (wrapper->_command_queue.try_pop(cmd)) {
-        if (!wrapper->process_command(cmd))
-          wrapper->report_error("error running cmd");
-      }
-
-			D3DXCOLOR c(1, 0, 1, 0);
-			wrapper->_immediate_context->ClearRenderTargetView(wrapper->_render_target_view, c);
-			wrapper->_immediate_context->ClearDepthStencilView(wrapper->_depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0 );
-			wrapper->_swap_chain->Present(0,0);
+			wrapper->tick();
 		}
 
 		delete p;
@@ -244,9 +304,51 @@ struct DXWrapper
 
 	bool load_mp3(const WCHAR *filename)
 	{
-		if (!FmodWrapper::instance().load(filename))
+		FmodWrapper& f = FmodWrapper::instance();
+		if (!f.load(filename))
 			return false;
 
+		int16_t *pcm = (int16_t *)f.samples();
+
+		// create a number of lods
+		const uint32_t cNumLods = 10;
+		uint32_t stride = 1;
+		
+		for (uint32_t i = 0; i < cNumLods; ++i) {
+
+			const uint32_t c = f.num_samples() / stride;
+			D3DXVECTOR3 *v_left = new D3DXVECTOR3[c];
+			D3DXVECTOR3 *v_right = new D3DXVECTOR3[c];
+			for (uint32_t i = 0, j = 0; j < c; i += stride, ++j) {
+				float left = pcm[i*2+0] / 32768.0f;
+				float right = pcm[i*2+1] / 32768.0f;
+				v_left[j] = D3DXVECTOR3(-1 + i / 44100.0f, left, 0);
+				v_right[j] = D3DXVECTOR3(- 1 + i / 44100.0f, right, 0);
+			}
+			
+			Lod lod;
+			lod._stride = stride;
+			lod._vertex_count = c;
+			create_static_vertex_buffer(Graphics::instance().device(), c, sizeof(D3DXVECTOR3), (const uint8_t *)v_left, &lod._vb_left);
+			create_static_vertex_buffer(Graphics::instance().device(), c, sizeof(D3DXVECTOR3), (const uint8_t *)v_right, &lod._vb_right);
+			
+			SAFE_ADELETE(v_left);
+			SAFE_ADELETE(v_right);
+
+			_lods.push_back(lod);
+			stride *= 2;
+		}
+		_vs.load_vertex_shader("c:/projects/spectrum/hosteddx/stuff.fx", "vsMain");
+		_ps.load_pixel_shader("c:/projects/spectrum/hosteddx/stuff.fx", "psMain");
+
+		D3D11_INPUT_ELEMENT_DESC desc[] = { 
+			//CD3D11_INPUT_ELEMENT_DESC("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0),
+			CD3D11_INPUT_ELEMENT_DESC("POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0),
+		};
+		_layout.Attach(_vs.create_input_layout(desc, ELEMS_IN_ARRAY(desc)));
+
+
+		_loaded = true;
 		return true;
 	}
 
@@ -258,87 +360,17 @@ struct DXWrapper
 		CreateThread(0, 0, d3d_thread, this, 0, &_thread_id);
 	}
 
-	void set_default_render_target()
-	{
-		ID3D11RenderTargetView* render_targets[] = { _render_target_view };
-		_immediate_context->OMSetRenderTargets(1, render_targets, _depth_stencil_view);
-		_immediate_context->RSSetViewports(1, &_viewport);
-	}
-
-	bool init_directx(const HWND hwnd, const int width, const int height)
-	{
-		auto buffer_format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-		DXGI_SWAP_CHAIN_DESC sd;
-		ZeroMemory( &sd, sizeof( sd ) );
-		sd.BufferCount = 1;
-		sd.BufferDesc.Width = width;
-		sd.BufferDesc.Height = height;
-		sd.BufferDesc.Format = buffer_format;
-		sd.BufferDesc.RefreshRate.Numerator = 60;
-		sd.BufferDesc.RefreshRate.Denominator = 1;
-		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		sd.OutputWindow = hwnd;
-		sd.SampleDesc.Count = 1;
-		sd.SampleDesc.Quality = 0;
-		sd.Windowed = TRUE;
-
-		const int flags = D3D11_CREATE_DEVICE_DEBUG;
-
-		if (FAILED(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context)))
-			return false;
-
-		if (_feature_level < D3D_FEATURE_LEVEL_9_3) {
-			return false;
-		}
-
-		CComPtr<ID3D11Texture2D> back_buffer;
-		if (FAILED(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer))))
-			return false;
-
-		if (FAILED(_device->CreateRenderTargetView(back_buffer, NULL, &_render_target_view)))
-			return false;
-
-		// depth buffer
-		D3D11_TEXTURE2D_DESC depthBufferDesc;
-		depthBufferDesc.Width = width;
-		depthBufferDesc.Height = height;
-		depthBufferDesc.MipLevels = 1;
-		depthBufferDesc.ArraySize = 1;
-		depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthBufferDesc.SampleDesc.Count = 1;
-		depthBufferDesc.SampleDesc.Quality = 0;
-		depthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		depthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-		depthBufferDesc.CPUAccessFlags = 0;
-		depthBufferDesc.MiscFlags = 0;
-
-		if (FAILED(_device->CreateTexture2D(&depthBufferDesc, NULL, &_depth_stencil)))
-			return false;
-
-		if (FAILED(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view)))
-			return false;
-
-		_viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)width, (float)height);
-		set_default_render_target();
-
-		return true;
-	}
+	bool _loaded;
+	EffectWrapper _vs;
+	EffectWrapper _ps;
 
 	ThreadParams _params;
 	DWORD _thread_id;
 
 	Concurrency::concurrent_queue<Command>	_command_queue;
-
-	D3D11_VIEWPORT _viewport;
-	DXGI_FORMAT _buffer_format;
-	D3D_FEATURE_LEVEL _feature_level;
-	CComPtr<ID3D11Device> _device;
-	CComPtr<IDXGISwapChain> _swap_chain;
-	CComPtr<ID3D11DeviceContext> _immediate_context;
-	CComPtr<ID3D11RenderTargetView> _render_target_view;
-	CComPtr<ID3D11Texture2D> _depth_stencil;
-	CComPtr<ID3D11DepthStencilView> _depth_stencil_view;
+	CComPtr<ID3D11InputLayout> _layout;
+	std::vector<Lod> _lods;
+	int	_cur_lod;
 };
 
 DXWrapper *DXWrapper::_instance = NULL;
@@ -421,6 +453,16 @@ extern "C"
 	{
     FmodWrapper::instance().pause(value);
 		return true;
+	}
+
+	HOST_EXPORT void __stdcall inc_lod()
+	{
+		DXWrapper::instance().add_command(Command(kCmdIncLod));
+	}
+
+	HOST_EXPORT void __stdcall dec_lod()
+	{
+		DXWrapper::instance().add_command(Command(kCmdDecLod));
 	}
 
 };

@@ -68,8 +68,10 @@ namespace spectrum
         {
             switch (e.Key) {
                 case Key.Add:
+                    NativeMethods.dec_lod();
                     break;
                 case Key.Subtract:
+                    NativeMethods.inc_lod();
                     break;
                 case Key.PageDown:
                     break;
@@ -180,6 +182,11 @@ namespace spectrum
         [DllImport("HostedDx.dll")]
         public static extern bool set_paused(bool state);
 
+        [DllImport("HostedDx.dll")]
+        public static extern void inc_lod();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void dec_lod();
     }
 
     public class DxHost : HwndHost

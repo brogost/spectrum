@@ -14,5 +14,27 @@
 #include <windows.h>
 
 
+#include <celsus/celsus.hpp>
+#include <celsus/celsusextra.hpp>
+#include <celsus/error2.hpp>
+#include <stdint.h>
 
-// TODO: reference additional headers your program requires here
+#include <string>
+#include <d3d11.h>
+#include <D3DX10math.h>
+#include <hash_map>
+#include <atlbase.h>
+#include <d3d11shader.h>
+#include <d3dcompiler.h>
+#include <map>
+
+#include <concurrent_queue.h>
+#include <stdint.h>
+#include <d3d11.h>
+#include <d3dx10.h>
+#include <atlbase.h>
+#include <string>
+#include <fmod.hpp>
+#include <boost/any.hpp>
+#include <celsus/celsus.hpp>
+#include <celsus/DX11Utils.hpp>
