@@ -1,4 +1,4 @@
-float4x4 mtx;
+matrix mtx;
 
 struct vsInput
 {

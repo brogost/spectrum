@@ -101,6 +101,7 @@ void FmodWrapper::start()
     return;
 
   _fmod_system->playSound(FMOD_CHANNEL_FREE, _sound, false, &_channel);
+  _channel->setVolume(0);
 }
 
 void FmodWrapper::stop()
@@ -148,7 +149,7 @@ bool FmodWrapper::load(const TCHAR *filename)
 	_sound->getLength(&raw_len, FMOD_TIMEUNIT_PCMBYTES);
 	_sound->getLength(&_num_samples, FMOD_TIMEUNIT_PCM);
 
-	_sample_rate = (long)(1000 * _num_samples) / (long)ms_len;
+	_sample_rate = 1000 * (uint64_t)_num_samples / ms_len;
 
 	// copy the raw bytes
 	_samples = new uint8_t[raw_len];
@@ -185,6 +186,63 @@ struct Lod
 	CComPtr<ID3D11Buffer>	_vb_left;
 	CComPtr<ID3D11Buffer>	_vb_right;
 };
+
+struct TimeSlice
+{
+  TimeSlice() : _start_ms(0), _end_ms(0), _vertex_count(0), _stride(0) {}
+  uint32_t  _start_ms;
+  uint32_t  _end_ms;
+
+  uint32_t	_vertex_count;
+  uint32_t	_stride;
+  CComPtr<ID3D11Buffer>	_vb_left;
+  CComPtr<ID3D11Buffer>	_vb_right;
+};
+
+struct Renderer
+{
+  void render_at_time(EffectWrapper *effect, ID3D11DeviceContext *context, const uint32_t start_ms, const uint32_t end_ms);
+
+  std::vector<TimeSlice> _slices;
+};
+
+void Renderer::render_at_time(EffectWrapper *effect, ID3D11DeviceContext *context, const uint32_t start_ms, const uint32_t end_ms)
+{
+  // find starting index
+  bool found = false;
+  int i = 0;
+  for (i = 0; i < (int)_slices.size(); ++i) {
+    TimeSlice& cur = _slices[i];
+    if (cur._start_ms >= start_ms) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found)
+    return;
+
+  UINT ofs = 0;
+  UINT strides = sizeof(D3DXVECTOR3);
+
+
+  D3DXMATRIX mtx;
+  D3DXMatrixIdentity(&mtx);
+  D3DXMatrixScaling(&mtx, 1 / ((end_ms - start_ms) / 1000.0f), 1, 1);
+  D3DXMatrixTranspose(&mtx, &mtx);
+  effect->set_variable("mtx", mtx);
+  effect->unmap_buffers();
+  effect->set_cbuffer();
+
+  for (;i < (int)_slices.size() && _slices[i]._start_ms < end_ms; ++i ) {
+
+    TimeSlice& cur = _slices[i];
+    ID3D11Buffer* bufs[] = { cur._vb_left };
+    context->IASetVertexBuffers(0, 1, &bufs[0], &strides, &ofs);
+    context->Draw(cur._vertex_count, 0);
+  }
+
+}
 
 struct DXWrapper
 {
@@ -267,19 +325,14 @@ struct DXWrapper
 			D3DXMatrixIdentity(&mtx);
 
 			uint32_t ms = FmodWrapper::instance().pos_in_ms();
+/*
 			D3DXMatrixTranslation(&mtx, -(ms / 10000.0f), 0, 0);
 			D3DXMatrixTranspose(&mtx, &mtx);
 			_vs.set_variable("mtx", mtx);
 			_vs.unmap_buffers();
 			_vs.set_cbuffer();
-
-			UINT ofs = 0;
-			UINT strides = sizeof(D3DXVECTOR3);
-			const Lod& cur = _lods[_cur_lod];
-			ID3D11Buffer* bufs[] = { cur._vb_left };
-			context->IASetVertexBuffers(0, 1, &bufs[0], &strides, &ofs);
-
-			context->Draw(cur._vertex_count, 0);
+      */
+      _renderer.render_at_time(&_vs, context, 0, 10000);
 		}
 		g.present();
 	}
@@ -310,20 +363,57 @@ struct DXWrapper
 
 		int16_t *pcm = (int16_t *)f.samples();
 
+    // split the stream into a number of 5 second chunks
+    const int len_ms = 1000 * (int64_t)f.num_samples() / f.sample_rate();
+    const int chunk_ms = 5000;
+    const int sample_rate = f.sample_rate();
+    int cur_ms = 0;
+    int idx = 0;
+    while (cur_ms < len_ms) {
+      int len = std::min<int>(chunk_ms, (len_ms - cur_ms));
+      int n = sample_rate * len / 1000;
+      D3DXVECTOR3 *v_left = new D3DXVECTOR3[n];
+      D3DXVECTOR3 *v_right = new D3DXVECTOR3[n];
+      for (int i = 0; i < n; ++i) {
+        // scale to -1..1
+        float left = pcm[i*2+0] / 32768.0f;
+        float right = pcm[i*2+1] / 32768.0f;
+        v_left[i] = D3DXVECTOR3((float)(i / (double)sample_rate), left, 0);
+        v_right[i] = D3DXVECTOR3((float)(i / (double)sample_rate), right, 0);
+      }
+
+      TimeSlice s;
+      s._vertex_count = n;
+      s._start_ms = cur_ms;
+      s._end_ms = cur_ms + len;
+      create_static_vertex_buffer(Graphics::instance().device(), n, sizeof(D3DXVECTOR3), (const uint8_t *)v_left, &s._vb_left);
+      create_static_vertex_buffer(Graphics::instance().device(), n, sizeof(D3DXVECTOR3), (const uint8_t *)v_right, &s._vb_right);
+
+      _renderer._slices.push_back(s);
+
+      SAFE_ADELETE(v_left);
+      SAFE_ADELETE(v_right);
+
+      cur_ms += chunk_ms;
+    }
+
+#if 0
 		// create a number of lods
 		const uint32_t cNumLods = 10;
-		uint32_t stride = 1;
+		uint32_t stride = 2;
 		
 		for (uint32_t i = 0; i < cNumLods; ++i) {
 
 			const uint32_t c = f.num_samples() / stride;
 			D3DXVECTOR3 *v_left = new D3DXVECTOR3[c];
 			D3DXVECTOR3 *v_right = new D3DXVECTOR3[c];
+      float mm = FLT_MAX;
 			for (uint32_t i = 0, j = 0; j < c; i += stride, ++j) {
+        // scale to -1..1
 				float left = pcm[i*2+0] / 32768.0f;
 				float right = pcm[i*2+1] / 32768.0f;
-				v_left[j] = D3DXVECTOR3(-1 + i / 44100.0f, left, 0);
-				v_right[j] = D3DXVECTOR3(- 1 + i / 44100.0f, right, 0);
+				v_left[j] = D3DXVECTOR3(i / 44100.0f, left, 0);
+				v_right[j] = D3DXVECTOR3(i / 44100.0f, right, 0);
 			}
 			
 			Lod lod;
@@ -338,8 +428,9 @@ struct DXWrapper
 			_lods.push_back(lod);
 			stride *= 2;
 		}
-		_vs.load_vertex_shader("c:/projects/spectrum/hosteddx/stuff.fx", "vsMain");
-		_ps.load_pixel_shader("c:/projects/spectrum/hosteddx/stuff.fx", "psMain");
+#endif
+		_vs.load_vertex_shader("hosteddx/stuff.fx", "vsMain");
+		_ps.load_pixel_shader("hosteddx/stuff.fx", "psMain");
 
 		D3D11_INPUT_ELEMENT_DESC desc[] = { 
 			//CD3D11_INPUT_ELEMENT_DESC("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0),
@@ -359,6 +450,8 @@ struct DXWrapper
 		_params.height = height;
 		CreateThread(0, 0, d3d_thread, this, 0, &_thread_id);
 	}
+
+  Renderer _renderer;
 
 	bool _loaded;
 	EffectWrapper _vs;
