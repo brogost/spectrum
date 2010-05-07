@@ -30,6 +30,15 @@
     <ClInclude Include="graphics.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="app.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fmod_helper.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -45,6 +54,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="graphics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="app.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fmod_helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

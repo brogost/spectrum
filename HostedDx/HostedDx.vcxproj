@@ -78,12 +78,16 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="app.hpp" />
     <ClInclude Include="effect_wrapper.hpp" />
+    <ClInclude Include="fmod_helper.hpp" />
     <ClInclude Include="graphics.hpp" />
+    <ClInclude Include="renderer.hpp" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="app.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -93,8 +97,10 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="effect_wrapper.cpp" />
+    <ClCompile Include="fmod_helper.cpp" />
     <ClCompile Include="graphics.cpp" />
     <ClCompile Include="HostedDx.cpp" />
+    <ClCompile Include="renderer.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
