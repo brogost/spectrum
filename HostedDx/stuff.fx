@@ -1,4 +1,5 @@
 matrix mtx;
+float4 color;
 
 struct vsInput
 {
@@ -17,7 +18,7 @@ vsOutput vsMain( in vsInput v )
 	return o;
 }
 
-float4 psMain(float4 v : SV_POSITION) : SV_TARGET
+float4 psMain(in vsOutput v) : SV_TARGET
 {
-	return float4(1,1,1,1);
+	return color;
 }

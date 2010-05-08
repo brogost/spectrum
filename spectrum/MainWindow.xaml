@@ -45,7 +45,7 @@
 				<CheckBox x:Name="AutoScroll"/>
 				<Button x:Name="Export" Content="Export" Width="75" Margin="10,0,10,4" d:LayoutOverrides="Height" Click="Export_Click" />
 				<Label Content="Cut Off" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                <TextBox x:Name="CutOff" TextWrapping="Wrap" Text="{Binding Path=CutOffValue, UpdateSourceTrigger=PropertyChanged}" Width="100" VerticalAlignment="Center"/>
+                <TextBox x:Name="CutOff" TextWrapping="Wrap" Text="{Binding Path=CutOffValue, UpdateSourceTrigger=PropertyChanged, Converter={x:Static spectrum:MainWindow.TextBoxConverter} }" Width="100" VerticalAlignment="Center"/>
 			</StackPanel>
     	</Grid>
     </Grid>

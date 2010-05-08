@@ -3,7 +3,12 @@
 #include "effect_wrapper.hpp"
 #include "graphics.hpp"
 
-void Renderer::render_at_time(EffectWrapper *effect, ID3D11DeviceContext *context, const uint32_t start_ms, const uint32_t end_ms)
+Renderer::~Renderer()
+{
+  container_delete(_slices);
+}
+
+void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11DeviceContext *context, const int32_t start_ms, const int32_t end_ms)
 {
 	if (start_ms == end_ms)
 		return;
@@ -11,40 +16,61 @@ void Renderer::render_at_time(EffectWrapper *effect, ID3D11DeviceContext *contex
 	std::vector<TimeSlice*> slices;
 	// find all the slices contained in the span
 	for (auto it = _slices.begin(); it != _slices.end(); ++it) {
-		if (it->_start_ms >= end_ms)
-			break;
-		if (it->_start_ms >= start_ms)
-			slices.push_back(&(*it));
+    const int32_t s = (*it)->_start_ms;
+    const int32_t e = (*it)->_end_ms;
+    if ((s >= start_ms && s < end_ms) || (e >= start_ms && e < end_ms) || (s <= start_ms && e >= end_ms))
+      slices.push_back(*it);
 	}
 
 	if (slices.empty())
 		return;
-
-	UINT ofs = 0;
-	UINT strides = sizeof(D3DXVECTOR3);
 
 	uint32_t cur = 0;
 	float start_ofs = 0;
 
 	// We want to scale end-ms - start-ms to 2 units
 	const float scale_x = 2 / ((end_ms - start_ms) / 1000.0f);
-	const float t = ((int32_t)start_ms - (int32_t)slices[0]->_start_ms) / 1000.0f;
+
+  // Calc how much to offset the first slice
+	const float t = (start_ms - slices[0]->_start_ms) / 1000.0f;
 	float offset_x = -1 - (t * scale_x);
 
+  D3DXMATRIX mtx, mtx2;
 	for (auto it = slices.begin();it != slices.end(); ++it) {
 		TimeSlice* t = *it;
 
-		D3DXMATRIX mtx, mtx2;
 		D3DXMatrixTranslation(&mtx, offset_x, 0, 0);
 		D3DXMatrixScaling(&mtx2, scale_x, 1, 1);
 		D3DXMatrixTranspose(&mtx, &(mtx2 * mtx));
-		effect->set_variable("mtx", mtx);
-		effect->unmap_buffers();
-		effect->set_cbuffer();
+		vs->set_variable("mtx", mtx);
+		vs->unmap_buffers();
+		vs->set_cbuffer();
 
-		ID3D11Buffer* bufs[] = { t->_vb_left };
-		context->IASetVertexBuffers(0, 1, &bufs[0], &strides, &ofs);
+    // left
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+    ps->set_variable("color", D3DXCOLOR(1,1,0,1));
+    ps->unmap_buffers();
+    ps->set_cbuffer();
+
+    set_vb(context, t->_vb_left, sizeof(D3DXVECTOR3));
 		context->Draw(t->_vertex_count, 0);
+
+    // right
+    ps->set_variable("color", D3DXCOLOR(1,0,0,1));
+    ps->unmap_buffers();
+    ps->set_cbuffer();
+
+    set_vb(context, t->_vb_right, sizeof(D3DXVECTOR3));
+    context->Draw(t->_vertex_count, 0);
+
+    // cut off
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+    ps->set_variable("color", D3DXCOLOR(1,1,1,1));
+    ps->unmap_buffers();
+    ps->set_cbuffer();
+
+    set_vb(context, t->_vb_cutoff, sizeof(D3DXVECTOR3));
+    context->Draw(t->_cutoff_vertex_count, 0);
 
 		offset_x += scale_x * ((t->_end_ms - t->_start_ms) / 1000.0f);
 	}

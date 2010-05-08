@@ -21,11 +21,51 @@ using System.Windows.Interop;
 namespace spectrum
 {
 
+    internal static class NativeMethods
+    {
+        [DllImport("HostedDx.dll")]
+        public static extern IntPtr create_d3d(int width, int height, IntPtr parent);
+
+        [DllImport("HostedDx.dll")]
+        public static extern void destroy_d3d();
+
+        [DllImport("HostedDx.dll")]
+        public static extern bool load_mp3([MarshalAs(UnmanagedType.LPWStr)]String s);
+
+        [DllImport("HostedDx.dll")]
+        public static extern bool start_mp3();
+
+        [DllImport("HostedDx.dll")]
+        public static extern bool stop_mp3();
+
+        [DllImport("HostedDx.dll")]
+        public static extern bool get_paused();
+
+        [DllImport("HostedDx.dll")]
+        public static extern bool set_paused(bool state);
+
+        [DllImport("HostedDx.dll")]
+        public static extern void inc_lod();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void dec_lod();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void inc_range();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void dec_range();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void set_cutoff(float value);
+    }
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
+
 
         public MainWindow()
         {
@@ -68,10 +108,10 @@ namespace spectrum
         {
             switch (e.Key) {
                 case Key.Add:
-                    NativeMethods.dec_lod();
+                    NativeMethods.inc_range();
                     break;
                 case Key.Subtract:
-                    NativeMethods.inc_lod();
+                    NativeMethods.dec_range();
                     break;
                 case Key.PageDown:
                     break;
@@ -152,41 +192,35 @@ namespace spectrum
  */
         }
 
+        public static readonly IValueConverter TextBoxConverter = new FloatConverter();
+
+        public class FloatConverter : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return null;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                float f;
+                if (value is string && float.TryParse(value as string, out f)) {
+                    return f;
+                }
+                return 0f;
+            }
+        }
+
         public double DpiX { get; set; }
         public double DpiY { get; set; }
 
         public int CurSongPos { get; set; }
-        public float CutOffValue { get; set; }
-    }
+        public float CutOffValue {
+            get { return _cutoff_value;  }
+            set { _cutoff_value = value; NativeMethods.set_cutoff(value); }
+        }
 
-    internal static class NativeMethods
-    {
-        [DllImport("HostedDx.dll")]
-        public static extern IntPtr create_d3d(int width, int height, IntPtr parent);
-
-        [DllImport("HostedDx.dll")]
-        public static extern void destroy_d3d();
-
-        [DllImport("HostedDx.dll")]
-        public static extern bool load_mp3([MarshalAs(UnmanagedType.LPWStr)]String s);
-
-        [DllImport("HostedDx.dll")]
-        public static extern bool start_mp3();
-
-        [DllImport("HostedDx.dll")]
-        public static extern bool stop_mp3();
-
-        [DllImport("HostedDx.dll")]
-        public static extern bool get_paused();
-
-        [DllImport("HostedDx.dll")]
-        public static extern bool set_paused(bool state);
-
-        [DllImport("HostedDx.dll")]
-        public static extern void inc_lod();
-
-        [DllImport("HostedDx.dll")]
-        public static extern void dec_lod();
+        private float _cutoff_value = 0;
     }
 
     public class DxHost : HwndHost

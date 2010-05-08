@@ -68,7 +68,7 @@ extern "C"
 
 	HOST_EXPORT bool __stdcall start_mp3()
 	{
-    FmodHelper::instance().start();
+    App::instance().add_command(Command(kCmdStartMp3));
 		return true;
 	}
 
@@ -98,5 +98,20 @@ extern "C"
 	{
 		App::instance().add_command(Command(kCmdDecLod));
 	}
+
+  HOST_EXPORT void __stdcall inc_range()
+  {
+    App::instance().add_command(Command(kCmdIncRange));
+  }
+
+  HOST_EXPORT void __stdcall dec_range()
+  {
+    App::instance().add_command(Command(kCmdDecRange));
+  }
+
+  HOST_EXPORT void __stdcall set_cutoff(float value)
+  {
+    App::instance().add_command(Command(kCmdSetCutoff, value));
+  }
 
 };

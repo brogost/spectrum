@@ -16,9 +16,13 @@ public:
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
 
+  const D3D11_VIEWPORT& viewport() const { return _viewport; }
+
 	void set_default_render_target();
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
+
+  CComPtr<IDXGISwapChain>& swap_chain() { return _swap_chain; }
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(Graphics);
