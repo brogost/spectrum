@@ -30,6 +30,8 @@ App& App::instance()
 	return *_instance;
 }
 
+int end = 10 * 1000;
+
 App::App()
 	: _loaded(false)
 	, _cur_lod(0)
@@ -49,8 +51,10 @@ bool App::process_command(const Command& cmd)
 	} else if (cmd._cmd == kCmdPauseMp3) {
 
 	} else if (cmd._cmd == kCmdIncLod) {
+		end += 10 * 1000;
 		//_cur_lod = std::min<int>(_cur_lod + 1, _lods.size() - 1);
 	} else if (cmd._cmd == kCmdDecLod) {
+		end -= 10 * 1000;
 		//_cur_lod = std::max<int>(_cur_lod - 1, 0);
 	} 
 
@@ -95,14 +99,10 @@ bool App::tick()
 		D3DXMatrixIdentity(&mtx);
 
 		uint32_t ms = FmodHelper::instance().pos_in_ms();
-		/*
-		D3DXMatrixTranslation(&mtx, -(ms / 10000.0f), 0, 0);
-		D3DXMatrixTranspose(&mtx, &mtx);
-		_vs.set_variable("mtx", mtx);
-		_vs.unmap_buffers();
-		_vs.set_cbuffer();
-		*/
-		_renderer->render_at_time(&_vs, context, 0, 1);
+		const uint32_t span = 10000;
+		const uint32_t start = ms >= 5000 ? ms - 5000 : 0;
+
+		_renderer->render_at_time(&_vs, context, start, start + span);
 	}
 	g.present();
 	return true;
@@ -140,10 +140,11 @@ bool App::load_mp3(const WCHAR *filename)
 	const int sample_rate = f.sample_rate();
 	int cur_ms = 0;
 	int idx = 0;
-	int stride = 10;
+	int stride = 128;
 
 	// The vertices are scaled so that the unit along the x-axis is seconds (relative _start_ms), and
 	// the y-axis is scaled between -1 and 1
+	int ofs = 0;
 	while (cur_ms < len_ms) {
 		int len = std::min<int>(chunk_ms, (len_ms - cur_ms));
 		int num_samples = sample_rate * len / 1000;
@@ -152,11 +153,12 @@ bool App::load_mp3(const WCHAR *filename)
 		int j = 0;
 		for (int i = 0; i < num_samples; i += stride, ++j) {
 			// scale to -1..1
-			float left = pcm[i*2+0] / 32768.0f;
-			float right = pcm[i*2+1] / 32768.0f;
+			float left = pcm[(i + ofs)*2+0] / 32768.0f;
+			float right = pcm[(i + ofs)*2+1] / 32768.0f;
 			v_left[j] = D3DXVECTOR3((float)(i / (double)sample_rate), left, 0);
 			v_right[j] = D3DXVECTOR3((float)(i / (double)sample_rate), right, 0);
 		}
+		ofs += num_samples;
 
 		TimeSlice s;
 		s._vertex_count = j;
