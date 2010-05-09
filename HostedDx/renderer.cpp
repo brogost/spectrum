@@ -63,14 +63,16 @@ void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11Device
     set_vb(context, t->_vb_right, sizeof(D3DXVECTOR3));
     context->Draw(t->_vertex_count, 0);
 
-    // cut off
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-    ps->set_variable("color", D3DXCOLOR(1,1,1,1));
-    ps->unmap_buffers();
-    ps->set_cbuffer();
+		if (t->_cutoff_vertex_count > 0) {
+			// cut off
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+			ps->set_variable("color", D3DXCOLOR(1,1,1,1));
+			ps->unmap_buffers();
+			ps->set_cbuffer();
 
-    set_vb(context, t->_vb_cutoff, sizeof(D3DXVECTOR3));
-    context->Draw(t->_cutoff_vertex_count, 0);
+			set_vb(context, t->_vb_cutoff, sizeof(D3DXVECTOR3));
+			context->Draw(t->_cutoff_vertex_count, 0);
+		}
 
 		offset_x += scale_x * ((t->_end_ms - t->_start_ms) / 1000.0f);
 	}

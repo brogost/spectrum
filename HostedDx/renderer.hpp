@@ -4,7 +4,7 @@ class EffectWrapper;
 
 struct TimeSlice
 {
-	TimeSlice() : _start_ms(0), _end_ms(0), _vertex_count(0), _stride(0) {}
+	TimeSlice() : _start_ms(0), _end_ms(0), _vertex_count(0), _stride(0), _cutoff_vertex_count(0) {}
 	int32_t  _start_ms;
 	int32_t  _end_ms;
 

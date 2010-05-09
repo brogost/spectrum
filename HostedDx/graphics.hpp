@@ -31,6 +31,7 @@ private:
 	~Graphics();
 
 	bool close_directx();
+	bool create_d3d10_device(IDXGIAdapter1* adapter, const D3D11_TEXTURE2D_DESC& back_buffer_desc);
 
 	static Graphics* _instance;
 
@@ -40,6 +41,7 @@ private:
 	DXGI_FORMAT _buffer_format;
   D3D_FEATURE_LEVEL _feature_level;
 	CComPtr<ID3D11Device> _device;
+	CComPtr<ID3D10Device1> _device10;
 	CComPtr<IDXGISwapChain> _swap_chain;
 	CComPtr<ID3D11DeviceContext> _immediate_context;
 	CComPtr<ID3D11RenderTargetView> _render_target_view;

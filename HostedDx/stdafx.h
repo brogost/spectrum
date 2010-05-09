@@ -38,3 +38,8 @@
 #include <boost/any.hpp>
 #include <celsus/celsus.hpp>
 #include <celsus/DX11Utils.hpp>
+
+#include <d2d1.h>
+#include <DWrite.h>
+#include <d2d1helper.h>
+#include <wincodec.h>

@@ -4,7 +4,7 @@
 #include "graphics.hpp"
 #include "fmod_helper.hpp"
 #include "renderer.hpp"
-#include "tiny_text.hpp"
+
 
 namespace
 {
@@ -18,17 +18,15 @@ namespace
 	};
 }
 
-#include <d2d1.h>
-#include <d2d1helper.h>
-#include <dwrite.h>
-#include <wincodec.h>
-
+/*
 ID2D1Factory *m_pD2DFactory;
 IWICImagingFactory *m_pWICFactory;
-IDWriteFactory *m_pDWriteFactory;
-IDWriteTextFormat *m_pTextFormat;
-ID2D1RenderTarget *m_pBackBufferRT;
-ID2D1SolidColorBrush *m_pBackBufferTextBrush;
+*/
+IDWriteFactory *m_pDWriteFactory = NULL;
+IDWriteTextFormat *m_pTextFormat = NULL;
+
+ID2D1RenderTarget *m_pBackBufferRT = NULL;
+ID2D1SolidColorBrush *m_pBackBufferTextBrush = NULL;
 
 static const WCHAR sc_helloWorld[] = L"Hello, World!";
 
@@ -45,7 +43,7 @@ inline void
     (*ppInterfaceToRelease) = NULL;
   }
 }
-
+/*
 HRESULT CreateDeviceIndependentResources()
 {
   static const WCHAR msc_fontName[] = L"Verdana";
@@ -132,7 +130,7 @@ HRESULT CreateDeviceIndependentResources()
 
   return hr;
 }
-
+*/
 
 
 App::App()
@@ -143,7 +141,6 @@ App::App()
 	, _renderer(new Renderer())
   , _cur_range(1)
   , _db_vertex_count(0)
-  , _tiny_text(NULL)
 {
 }
 
@@ -223,6 +220,7 @@ bool App::tick()
     _vs.set_cbuffer();
 
     // draw background
+		context->IASetInputLayout(_layout);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
     _ps.set_variable("color", D3DXCOLOR(0.2f, 0.2f, 0.2f,1));
     _ps.unmap_buffers();
@@ -233,7 +231,6 @@ bool App::tick()
 
     // draw foreground
 
-		context->IASetInputLayout(_layout);
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 
 		D3DXMATRIX mtx;
@@ -245,6 +242,7 @@ bool App::tick()
 
 		_renderer->render_at_time(&_vs, &_ps, context, start, start + span);
 
+/*
     m_pBackBufferRT->BeginDraw();
     m_pBackBufferRT->SetTransform(D2D1::Matrix3x2F::Identity());
 
@@ -259,6 +257,7 @@ bool App::tick()
       );
 
     HRESULT hr = m_pBackBufferRT->EndDraw();
+*/
 
 	}
 	g.present();
@@ -339,7 +338,9 @@ DWORD WINAPI App::d3d_thread(void *params)
 
   //wrapper->_tiny_text = new TinyTextContext_c(Graphics::instance().device(), Graphics::instance().context(), 128);
 
-  CreateDeviceIndependentResources();
+
+
+  //CreateDeviceIndependentResources();
 
 	while (true) {
 		if (!wrapper->tick())

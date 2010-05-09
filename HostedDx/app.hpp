@@ -1,8 +1,6 @@
 #pragma once
 #include "effect_wrapper.hpp"
 
-class TinyTextContext_c;
-
 struct Command
 {
 	Command() {}
@@ -69,5 +67,4 @@ private:
 	int	_cur_lod;
   int _cur_range;
 
-  TinyTextContext_c *_tiny_text;
 };
