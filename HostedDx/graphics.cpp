@@ -53,7 +53,6 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 	sd.SampleDesc.Quality = 0;
 	sd.Windowed = TRUE;
 
-
 	// Create DXGI factory to enumerate adapters
 	CComPtr<IDXGIFactory1> dxgi_factory;
 	if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory)))
@@ -64,15 +63,15 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 	IDXGIAdapter1 * pAdapter; 
 	std::vector <IDXGIAdapter1*> vAdapters; 
 	while(dxgi_factory->EnumAdapters1(i, &pAdapter) != DXGI_ERROR_NOT_FOUND) { 
-		vAdapters.push_back(pAdapter); 
+		vAdapters.push_back(pAdapter);
 		++i; 
 	}
 
-	const int flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+	const int flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_SINGLETHREADED;
 
 	// Create the DX11 device
 	RETURN_ON_FAIL_BOOL(D3D11CreateDeviceAndSwapChain(
-		NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context),
+		vAdapters.front(), D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context),
     ErrorPredicate<HRESULT>, LOG_ERROR_LN);
 
 	if (_feature_level < D3D_FEATURE_LEVEL_9_3) {
@@ -107,8 +106,8 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 	_viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
 	set_default_render_target();
 
-	//if (!create_d3d10_device(NULL, back_buffer_desc))
-		//return false;
+	if (!create_d3d10_device(NULL, back_buffer_desc))
+		return false;
 
 	return true;
 }
@@ -116,44 +115,43 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 bool Graphics::create_d3d10_device(IDXGIAdapter1* adapter, const D3D11_TEXTURE2D_DESC& back_buffer_desc)
 {
 
+  // Create the shared texture to draw D2D content to
+  D3D11_TEXTURE2D_DESC sharedTextureDesc;
+  CComPtr<ID3D11Texture2D> pSharedTexture11;
+
+  ZeroMemory(&sharedTextureDesc, sizeof(sharedTextureDesc));
+  sharedTextureDesc.Width = back_buffer_desc.Width;
+  sharedTextureDesc.Height = back_buffer_desc.Height;
+  sharedTextureDesc.MipLevels = 1;
+  sharedTextureDesc.ArraySize = 1;
+  sharedTextureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  sharedTextureDesc.SampleDesc.Count = 1;
+  sharedTextureDesc.Usage = D3D11_USAGE_DEFAULT;
+  sharedTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+  sharedTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+
+  HRESULT hResult = _device->CreateTexture2D(&sharedTextureDesc, NULL, &pSharedTexture11);
+
+  // Get the keyed mutex for the shared texture (for D3D11)
+  CComPtr<IDXGIKeyedMutex> pKeyedMutex11;
+  hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&pKeyedMutex11);
+
+  // Get the shared handle needed to open the shared texture in D3D10.1
+  CComPtr<IDXGIResource> pSharedResource11;
+  HANDLE hSharedHandle11;
+  hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIResource), (void**)&pSharedResource11);
+  hResult = pSharedResource11->GetSharedHandle(&hSharedHandle11);
+
 	// Create the DX10 device
 	if (FAILED(D3D10CreateDevice1(
 		NULL,
 		D3D10_DRIVER_TYPE_HARDWARE,
 		NULL,
-		D3D10_CREATE_DEVICE_DEBUG |
-		D3D10_CREATE_DEVICE_BGRA_SUPPORT,
+		D3D10_CREATE_DEVICE_DEBUG | D3D10_CREATE_DEVICE_BGRA_SUPPORT  | D3D11_CREATE_DEVICE_SINGLETHREADED,
 		D3D10_FEATURE_LEVEL_9_3,
 		D3D10_1_SDK_VERSION,
 		&_device10)))
 		return false;
-
-	// Create the shared texture to draw D2D content to
-	D3D11_TEXTURE2D_DESC sharedTextureDesc;
-	CComPtr<ID3D11Texture2D> pSharedTexture11;
-
-	ZeroMemory(&sharedTextureDesc, sizeof(sharedTextureDesc));
-	sharedTextureDesc.Width = back_buffer_desc.Width;
-	sharedTextureDesc.Height = back_buffer_desc.Height;
-	sharedTextureDesc.MipLevels = 1;
-	sharedTextureDesc.ArraySize = 1;
-	sharedTextureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-	sharedTextureDesc.SampleDesc.Count = 1;
-	sharedTextureDesc.Usage = D3D11_USAGE_DEFAULT;
-	sharedTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-	sharedTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-
-	HRESULT hResult = _device->CreateTexture2D(&sharedTextureDesc, NULL, &pSharedTexture11);
-
-	// Get the keyed mutex for the shared texture (for D3D11)
-	CComPtr<IDXGIKeyedMutex> pKeyedMutex11;
-	hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&pKeyedMutex11);
-
-	// Get the shared handle needed to open the shared texture in D3D10.1
-	CComPtr<IDXGIResource> pSharedResource11;
-	HANDLE hSharedHandle11;
-	hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIResource), (void**)&pSharedResource11);
-	hResult = pSharedResource11->GetSharedHandle(&hSharedHandle11);
 
 	// Open the surface for the shared texture in D3D10.1
 	CComPtr<IDXGISurface1> pSharedSurface10;
