@@ -37,7 +37,7 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 {
 	_width = width;
 	_height = height;
-	_buffer_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	_buffer_format = DXGI_FORMAT_B8G8R8A8_UNORM; //DXGI_FORMAT_R8G8B8A8_UNORM;
 
 	DXGI_SWAP_CHAIN_DESC sd;
 	ZeroMemory( &sd, sizeof( sd ) );
@@ -59,19 +59,15 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 		return false;
 
 	// Use the first adapter
-	UINT i = 0; 
-	IDXGIAdapter1 * pAdapter; 
-	std::vector <IDXGIAdapter1*> vAdapters; 
-	while(dxgi_factory->EnumAdapters1(i, &pAdapter) != DXGI_ERROR_NOT_FOUND) { 
-		vAdapters.push_back(pAdapter);
-		++i; 
-	}
+	CComPtr<IDXGIAdapter1> adapter; 
+	if (FAILED(dxgi_factory->EnumAdapters1(0, &adapter)))
+		return false;
 
 	const int flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_SINGLETHREADED;
 
 	// Create the DX11 device
 	RETURN_ON_FAIL_BOOL(D3D11CreateDeviceAndSwapChain(
-		vAdapters.front(), D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context),
+		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context),
     ErrorPredicate<HRESULT>, LOG_ERROR_LN);
 
 	if (_feature_level < D3D_FEATURE_LEVEL_9_3) {
@@ -79,72 +75,9 @@ bool Graphics::init_directx(const HWND hwnd, const int width, const int height)
 		return false;
 	}
 
-	CComPtr<ID3D11Texture2D> back_buffer;
-	RETURN_ON_FAIL_BOOL(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer)), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
-	RETURN_ON_FAIL_BOOL(_device->CreateRenderTargetView(back_buffer, NULL, &_render_target_view), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
-
-	D3D11_TEXTURE2D_DESC back_buffer_desc;
-	back_buffer->GetDesc(&back_buffer_desc);
-
-	// depth buffer
-	D3D11_TEXTURE2D_DESC depthBufferDesc;
-	depthBufferDesc.Width = width;
-	depthBufferDesc.Height = height;
-	depthBufferDesc.MipLevels = 1;
-	depthBufferDesc.ArraySize = 1;
-	depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthBufferDesc.SampleDesc.Count = 1;
-	depthBufferDesc.SampleDesc.Quality = 0;
-	depthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	depthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	depthBufferDesc.CPUAccessFlags = 0;
-	depthBufferDesc.MiscFlags = 0;
-
-	RETURN_ON_FAIL_BOOL(_device->CreateTexture2D(&depthBufferDesc, NULL, &_depth_stencil), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
-	RETURN_ON_FAIL_BOOL(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
-
-	_viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
-	set_default_render_target();
-
-	if (!create_d3d10_device(NULL, back_buffer_desc))
-		return false;
-
-	return true;
-}
-
-bool Graphics::create_d3d10_device(IDXGIAdapter1* adapter, const D3D11_TEXTURE2D_DESC& back_buffer_desc)
-{
-
-  // Create the shared texture to draw D2D content to
-  D3D11_TEXTURE2D_DESC sharedTextureDesc;
-  CComPtr<ID3D11Texture2D> pSharedTexture11;
-
-  ZeroMemory(&sharedTextureDesc, sizeof(sharedTextureDesc));
-  sharedTextureDesc.Width = back_buffer_desc.Width;
-  sharedTextureDesc.Height = back_buffer_desc.Height;
-  sharedTextureDesc.MipLevels = 1;
-  sharedTextureDesc.ArraySize = 1;
-  sharedTextureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-  sharedTextureDesc.SampleDesc.Count = 1;
-  sharedTextureDesc.Usage = D3D11_USAGE_DEFAULT;
-  sharedTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-  sharedTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-
-  HRESULT hResult = _device->CreateTexture2D(&sharedTextureDesc, NULL, &pSharedTexture11);
-
-  // Get the keyed mutex for the shared texture (for D3D11)
-  CComPtr<IDXGIKeyedMutex> pKeyedMutex11;
-  hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&pKeyedMutex11);
-
-  // Get the shared handle needed to open the shared texture in D3D10.1
-  CComPtr<IDXGIResource> pSharedResource11;
-  HANDLE hSharedHandle11;
-  hResult = pSharedTexture11->QueryInterface(__uuidof(IDXGIResource), (void**)&pSharedResource11);
-  hResult = pSharedResource11->GetSharedHandle(&hSharedHandle11);
-
 	// Create the DX10 device
 	if (FAILED(D3D10CreateDevice1(
-		NULL,
+		adapter,
 		D3D10_DRIVER_TYPE_HARDWARE,
 		NULL,
 		D3D10_CREATE_DEVICE_DEBUG | D3D10_CREATE_DEVICE_BGRA_SUPPORT  | D3D11_CREATE_DEVICE_SINGLETHREADED,
@@ -153,13 +86,46 @@ bool Graphics::create_d3d10_device(IDXGIAdapter1* adapter, const D3D11_TEXTURE2D
 		&_device10)))
 		return false;
 
+
+	// Get the dx11 back buffer
+	D3D11_TEXTURE2D_DESC back_buffer_desc;
+	RETURN_ON_FAIL_BOOL(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_back_buffer)), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
+	_back_buffer->GetDesc(&back_buffer_desc);
+
+	// Create the shared texture to draw D2D content to
+	D3D11_TEXTURE2D_DESC sharedTextureDesc;
+
+	ZeroMemory(&sharedTextureDesc, sizeof(sharedTextureDesc));
+	sharedTextureDesc.Width = back_buffer_desc.Width;
+	sharedTextureDesc.Height = back_buffer_desc.Height;
+	sharedTextureDesc.MipLevels = 1;
+	sharedTextureDesc.ArraySize = 1;
+	sharedTextureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	sharedTextureDesc.SampleDesc.Count = 1;
+	sharedTextureDesc.Usage = D3D11_USAGE_DEFAULT;
+	sharedTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+	sharedTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+
+	HRESULT hResult = S_OK;
+	hResult = _device->CreateTexture2D(&sharedTextureDesc, NULL, &_shared_texture);
+	hResult = _device->CreateShaderResourceView(_shared_texture, NULL, &_shared_texture_view);
+
+	// Get the keyed mutex for the shared texture (for D3D11)
+	hResult = _shared_texture->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&_keyed_mutex_11);
+
+	// Get the shared handle needed to open the shared texture in D3D10.1
+	CComPtr<IDXGIResource> pSharedResource11;
+	HANDLE hSharedHandle11;
+	hResult = _shared_texture->QueryInterface(__uuidof(IDXGIResource), (void**)&pSharedResource11);
+	hResult = pSharedResource11->GetSharedHandle(&hSharedHandle11);
+
+
 	// Open the surface for the shared texture in D3D10.1
 	CComPtr<IDXGISurface1> pSharedSurface10;
 	hResult = _device10->OpenSharedResource(hSharedHandle11, __uuidof(IDXGISurface1), (void**)&pSharedSurface10);
 
 	// Get the keyed mutex for the shared texture (for D3D10.1)
-	CComPtr<IDXGIKeyedMutex> pKeyedMutex10;
-	hResult = pSharedSurface10->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&pKeyedMutex10);
+	hResult = pSharedSurface10->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&_keyed_mutex_10);
 
 	CComPtr<ID2D1Factory> pD2DFactory;
 	hResult = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory), (void**)&pD2DFactory);
@@ -191,6 +157,28 @@ bool Graphics::create_d3d10_device(IDXGIAdapter1* adapter, const D3D11_TEXTURE2D
 		L"", //locale
 		&m_pTextFormat
 		);
+
+	RETURN_ON_FAIL_BOOL(_device->CreateRenderTargetView(_back_buffer, NULL, &_render_target_view), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
+
+	// depth buffer
+	D3D11_TEXTURE2D_DESC depthBufferDesc;
+	depthBufferDesc.Width = width;
+	depthBufferDesc.Height = height;
+	depthBufferDesc.MipLevels = 1;
+	depthBufferDesc.ArraySize = 1;
+	depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthBufferDesc.SampleDesc.Count = 1;
+	depthBufferDesc.SampleDesc.Quality = 0;
+	depthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	depthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	depthBufferDesc.CPUAccessFlags = 0;
+	depthBufferDesc.MiscFlags = 0;
+
+	RETURN_ON_FAIL_BOOL(_device->CreateTexture2D(&depthBufferDesc, NULL, &_depth_stencil), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
+	RETURN_ON_FAIL_BOOL(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view), ErrorPredicate<HRESULT>, LOG_ERROR_LN);
+
+	_viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
+	set_default_render_target();
 
 	return true;
 }

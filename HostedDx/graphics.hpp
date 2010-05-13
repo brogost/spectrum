@@ -24,7 +24,7 @@ public:
 
   CComPtr<IDXGISwapChain>& swap_chain() { return _swap_chain; }
 
-private:
+//private:
 	DISALLOW_COPY_AND_ASSIGN(Graphics);
 
 	Graphics();
@@ -47,6 +47,13 @@ private:
 	CComPtr<ID3D11RenderTargetView> _render_target_view;
 	CComPtr<ID3D11Texture2D> _depth_stencil;
 	CComPtr<ID3D11DepthStencilView> _depth_stencil_view;
+
+	CComPtr<ID3D11Texture2D> _back_buffer;
+	CComPtr<ID3D11ShaderResourceView> _shared_texture_view;
+	CComPtr<ID3D11Texture2D> _shared_texture;
+	CComPtr<IDXGIKeyedMutex> _keyed_mutex_10;
+	CComPtr<IDXGIKeyedMutex> _keyed_mutex_11;
+
 };
 
 #endif

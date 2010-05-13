@@ -42,7 +42,7 @@ namespace spectrum
         public static extern bool get_paused();
 
         [DllImport("HostedDx.dll")]
-        public static extern bool set_paused(bool state);
+        public static extern void set_paused(bool state);
 
         [DllImport("HostedDx.dll")]
         public static extern void inc_lod();
@@ -55,6 +55,12 @@ namespace spectrum
 
         [DllImport("HostedDx.dll")]
         public static extern void dec_range();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void inc_page();
+
+        [DllImport("HostedDx.dll")]
+        public static extern void dec_page();
 
         [DllImport("HostedDx.dll")]
         public static extern void set_cutoff(float value);
@@ -121,8 +127,10 @@ namespace spectrum
                     NativeMethods.set_paused(!NativeMethods.get_paused());
                     break;
                 case Key.Left:
+                    NativeMethods.dec_page();
                     break;
                 case Key.Right:
+                    NativeMethods.inc_page();
                     break;
             }
         }
@@ -204,10 +212,9 @@ namespace spectrum
             public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
             {
                 float f;
-                if (value is string && float.TryParse(value as string, out f)) {
+                if (value is string && float.TryParse(value as string, out f)) 
                     return f;
-                }
-                return 0f;
+                return DependencyProperty.UnsetValue;
             }
         }
 

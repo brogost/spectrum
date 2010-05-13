@@ -21,7 +21,8 @@ public:
 	uint32_t num_samples() const { return _num_samples; }
 	uint8_t*	samples() const { return _samples; }
 
-	uint32_t pos_in_ms();
+	int32_t pos_in_ms();
+	void change_pos(const int32_t ofs);
 
 private:
 

@@ -8,7 +8,18 @@ Renderer::~Renderer()
   container_delete(_slices);
 }
 
-void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11DeviceContext *context, const int32_t start_ms, const int32_t end_ms)
+// given a range, [start_x, end_x), calc where ms would end up if the
+// range was scaled from -1..1
+float shifted_pos(const int start_ms, const int end_ms, const int ms)
+{
+	const float scale_x = 2 / ((end_ms - start_ms) / 1000.0f);
+
+	// Calc how much to offset the first slice
+	const float t = (start_ms - ms) / 1000.0f;
+	return -1 - (t * scale_x);
+}
+
+void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11DeviceContext *context, const int32_t start_ms, const int32_t end_ms, const int32_t cur_pos)
 {
 	if (start_ms == end_ms)
 		return;
@@ -32,8 +43,7 @@ void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11Device
 	const float scale_x = 2 / ((end_ms - start_ms) / 1000.0f);
 
   // Calc how much to offset the first slice
-	const float t = (start_ms - slices[0]->_start_ms) / 1000.0f;
-	float offset_x = -1 - (t * scale_x);
+	float offset_x = shifted_pos(start_ms, end_ms, slices[0]->_start_ms);
 
   D3DXMATRIX mtx, mtx2;
 	for (auto it = slices.begin();it != slices.end(); ++it) {
@@ -76,5 +86,20 @@ void Renderer::render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11Device
 
 		offset_x += scale_x * ((t->_end_ms - t->_start_ms) / 1000.0f);
 	}
+
+	// draw the now-playing
+	D3DXMatrixTranslation(&mtx, shifted_pos(start_ms, end_ms, cur_pos), 0, 0);
+	D3DXMatrixScaling(&mtx2, scale_x, 1, 1);
+	D3DXMatrixTranspose(&mtx, &(mtx2 * mtx));
+	vs->set_variable("mtx", mtx);
+	vs->unmap_buffers();
+	vs->set_cbuffer();
+	ps->set_variable("color", D3DXCOLOR(0,0.1f,0.7f,1));
+	ps->unmap_buffers();
+	ps->set_cbuffer();
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	set_vb(context, _vb_current_pos, sizeof(D3DXVECTOR3));
+	context->Draw(4, 0);
 
 }

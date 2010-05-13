@@ -4,7 +4,7 @@
 #include "graphics.hpp"
 #include "fmod_helper.hpp"
 #include "renderer.hpp"
-
+#include <celsus/D3D11Descriptions.hpp>
 
 namespace
 {
@@ -18,10 +18,6 @@ namespace
 	};
 }
 
-/*
-ID2D1Factory *m_pD2DFactory;
-IWICImagingFactory *m_pWICFactory;
-*/
 IDWriteFactory *m_pDWriteFactory = NULL;
 IDWriteTextFormat *m_pTextFormat = NULL;
 
@@ -43,95 +39,6 @@ inline void
     (*ppInterfaceToRelease) = NULL;
   }
 }
-/*
-HRESULT CreateDeviceIndependentResources()
-{
-  static const WCHAR msc_fontName[] = L"Verdana";
-  static const FLOAT msc_fontSize = 50;
-  ID2D1GeometrySink *pSink = NULL;
-  HRESULT hr;
-
-  // Create D2D factory
-  hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pD2DFactory);
-  if (SUCCEEDED(hr))
-  {
-    // Create a WIC factory
-    hr = CoCreateInstance(
-      CLSID_WICImagingFactory,
-      NULL,
-      CLSCTX_INPROC_SERVER,
-      IID_IWICImagingFactory,
-      reinterpret_cast<void **>(&m_pWICFactory)
-      );
-  }
-  if (SUCCEEDED(hr))
-  {
-    // Create DWrite factory
-    hr = DWriteCreateFactory(
-      DWRITE_FACTORY_TYPE_SHARED,
-      __uuidof(m_pDWriteFactory),
-      reinterpret_cast<IUnknown **>(&m_pDWriteFactory)
-      );
-  }
-  if (SUCCEEDED(hr))
-  {
-    // Create DWrite text format object
-    hr = m_pDWriteFactory->CreateTextFormat(
-      msc_fontName,
-      NULL,
-      DWRITE_FONT_WEIGHT_NORMAL,
-      DWRITE_FONT_STYLE_NORMAL,
-      DWRITE_FONT_STRETCH_NORMAL,
-      msc_fontSize,
-      L"", //locale
-      &m_pTextFormat
-      );
-  }
-  if (SUCCEEDED(hr))
-  {
-    // Center the text both horizontally and vertically.
-    m_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-    m_pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-  }
-
-  // Create the DXGI Surface Render Target.
-  FLOAT dpiX;
-  FLOAT dpiY;
-  m_pD2DFactory->GetDesktopDpi(&dpiX, &dpiY);
-
-  D2D1_RENDER_TARGET_PROPERTIES props =
-    D2D1::RenderTargetProperties(
-    D2D1_RENDER_TARGET_TYPE_DEFAULT,
-    D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-    dpiX,
-    dpiY
-    );
-
-  CComPtr<IDXGISurface> pBackBuffer;
-
-  // Get a surface in the swap chain
-  hr = Graphics::instance().swap_chain()->GetBuffer(0,IID_PPV_ARGS(&pBackBuffer));
-
-
-  // Create a Direct2D render target which can draw into the surface in the swap chain
-  SafeRelease(&m_pBackBufferRT);
-  hr = m_pD2DFactory->CreateDxgiSurfaceRenderTarget(
-    pBackBuffer,
-    &props,
-    &m_pBackBufferRT
-    );
-
-  // Create a red brush for text drawn into the back buffer
-  hr = m_pBackBufferRT->CreateSolidColorBrush(
-    D2D1::ColorF(D2D1::ColorF::Red),
-    &m_pBackBufferTextBrush
-    );
-
-  return hr;
-}
-*/
-
 
 App::App()
 	: _loaded(false)
@@ -147,30 +54,42 @@ App::App()
 bool App::process_command(const Command& cmd)
 {
   try {
-    if (cmd._cmd == kCmdLoadMp3) {
-      if (!load_mp3(boost::any_cast<std::wstring>(cmd._param).c_str()))
-        return false;
-
-    } else if (cmd._cmd == kCmdStartMp3) {
-      FmodHelper::instance().start();
-
-    } else if (cmd._cmd == kCmdPauseMp3) {
-
-    } else if (cmd._cmd == kCmdIncLod) {
-
-    } else if (cmd._cmd == kCmdDecLod) {
-
-    } else if (cmd._cmd == kCmdIncRange) {
-      if (_cur_range < 65536)
-        _cur_range *= 2;
-
-    } else if (cmd._cmd == kCmdDecRange) {
-      if (_cur_range > 1)
-        _cur_range /= 2;
-
-    } else if (cmd._cmd == kCmdSetCutoff) {
-      process_cutoff(boost::any_cast<float>(cmd._param));
-    }
+		switch (cmd._cmd) {
+		case kCmdLoadMp3:
+			if (!load_mp3(boost::any_cast<std::wstring>(cmd._param).c_str()))
+				return false;
+			break;
+		case kCmdStartMp3:
+			FmodHelper::instance().start();
+			break;
+		case kCmdIncLod:
+			break;
+		case kCmdDecLod:
+			break;
+		case kCmdIncRange:
+			if (_cur_range < 65536)
+				_cur_range *= 2;
+			break;
+		case kCmdDecRange:
+			if (_cur_range > 1)
+				_cur_range /= 2;
+			break;
+		case kCmdIncPage:
+			{
+				const int32_t span = 100 * _cur_range;
+				FmodHelper::instance().change_pos(span);
+			}
+			break;
+		case kCmdDecPage:
+			{
+				const int32_t span = 100 * _cur_range;
+				FmodHelper::instance().change_pos(-span);
+			}
+			break;
+		case kCmdSetCutoff:
+			process_cutoff(boost::any_cast<float>(cmd._param));
+			break;
+		}
   } catch (const boost::bad_any_cast& /*e*/) {
     return false;
   }
@@ -186,50 +105,80 @@ void App::add_command(const Command& cmd)
 	_command_queue.push(cmd);
 }
 
+void App::draw_text()
+{
+	Graphics& g = Graphics::instance();
+	auto context = Graphics::instance().context();
 
-bool App::tick()
+	// draw text
+	g._keyed_mutex_10->AcquireSync(0, INFINITE);
+	m_pBackBufferRT->BeginDraw();
+	m_pBackBufferRT->SetTransform(D2D1::Matrix3x2F::Identity());
+
+	// Text format object will center the text in layout
+	D2D1_SIZE_F rtSize = m_pBackBufferRT->GetSize();
+	m_pBackBufferRT->DrawText(
+		sc_helloWorld,
+		ARRAYSIZE(sc_helloWorld) - 1,
+		m_pTextFormat,
+		D2D1::RectF(0.0f, 0.0f, rtSize.width, rtSize.height),
+		m_pBackBufferTextBrush
+		);
+
+	HRESULT hr = m_pBackBufferRT->EndDraw();
+
+	g._keyed_mutex_10->ReleaseSync(1);
+	g._keyed_mutex_11->AcquireSync(1, INFINITE);
+
+	set_vb(context, NULL, 0);
+	context->VSSetShader(_fs_vs.vertex_shader(), NULL, 0);
+	context->PSSetShader(_fs_ps.pixel_shader(), NULL, 0);
+	context->GSSetShader(NULL, NULL, 0);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	ID3D11SamplerState *s[] = { _sampler };
+	context->PSSetSamplers(0, 1, s);
+	ID3D11ShaderResourceView *r[] = { g._shared_texture_view };
+	context->PSSetShaderResources(0, 1, r);
+	context->OMSetDepthStencilState(_fs_depth_state, 0);
+	context->Draw(4, 0);
+
+	g._keyed_mutex_11->ReleaseSync(0);
+}
+
+void App::render()
 {
 	Graphics& g = Graphics::instance();
 	ID3D11DeviceContext *context = g.context();
-
-	// process any commands
-	Command cmd;
-	while (_command_queue.try_pop(cmd)) {
-		if (cmd._cmd == kCmdQuit)
-			return false;
-		if (!process_command(cmd))
-			report_error("error running cmd");
-	}
 
 	D3DXCOLOR c(0.1f, 0.1f, 0.1f, 0);
 	g.clear(c);
 
 	if (_loaded) {
 
-    //_tiny_text->Print(g.viewport(), "Herro mr!", 0, 0);
-    //_tiny_text->Render();
+		Graphics& g = Graphics::instance();
 
+		context->OMSetDepthStencilState(_lines_depth_state, 0);
 		context->VSSetShader(_vs.vertex_shader(), NULL, 0);
 		context->PSSetShader(_ps.pixel_shader(), NULL, 0);
 		context->GSSetShader(NULL, NULL, 0);
 
-    D3DXMATRIX id;
-    D3DXMatrixIdentity(&id);
-    _vs.set_variable("mtx", id);
-    _vs.unmap_buffers();
-    _vs.set_cbuffer();
+		D3DXMATRIX id;
+		D3DXMatrixIdentity(&id);
+		_vs.set_variable("mtx", id);
+		_vs.unmap_buffers();
+		_vs.set_cbuffer();
 
-    // draw background
+		// draw background
 		context->IASetInputLayout(_layout);
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-    _ps.set_variable("color", D3DXCOLOR(0.2f, 0.2f, 0.2f,1));
-    _ps.unmap_buffers();
-    _ps.set_cbuffer();
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+		_ps.set_variable("color", D3DXCOLOR(0.2f, 0.2f, 0.2f,1));
+		_ps.unmap_buffers();
+		_ps.set_cbuffer();
 
-    set_vb(context, _vb_db_lines, sizeof(D3DXVECTOR3));
-    context->Draw(_db_vertex_count, 0);
+		set_vb(context, _vb_db_lines, sizeof(D3DXVECTOR3));
+		context->Draw(_db_vertex_count, 0);
 
-    // draw foreground
+		// draw foreground
 
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 
@@ -240,27 +189,28 @@ bool App::tick()
 		const int32_t span = 100 * _cur_range;
 		const int32_t start = ms - span/2;
 
-		_renderer->render_at_time(&_vs, &_ps, context, start, start + span);
+		_renderer->render_at_time(&_vs, &_ps, context, start, start + span, FmodHelper::instance().pos_in_ms());
 
-/*
-    m_pBackBufferRT->BeginDraw();
-    m_pBackBufferRT->SetTransform(D2D1::Matrix3x2F::Identity());
-
-    // Text format object will center the text in layout
-    D2D1_SIZE_F rtSize = m_pBackBufferRT->GetSize();
-    m_pBackBufferRT->DrawText(
-      sc_helloWorld,
-      ARRAYSIZE(sc_helloWorld) - 1,
-      m_pTextFormat,
-      D2D1::RectF(0.0f, 0.0f, rtSize.width, rtSize.height),
-      m_pBackBufferTextBrush
-      );
-
-    HRESULT hr = m_pBackBufferRT->EndDraw();
-*/
+		draw_text();
 
 	}
 	g.present();
+}
+
+bool App::tick()
+{
+
+	// process any commands
+	Command cmd;
+	while (_command_queue.try_pop(cmd)) {
+		if (cmd._cmd == kCmdQuit)
+			return false;
+		if (!process_command(cmd))
+			report_error("error running cmd");
+	}
+
+	render();
+
 	return true;
 }
 
@@ -326,6 +276,39 @@ void App::process_cutoff(const float db)
   }
 }
 
+void App::create_buffers()
+{
+	// create current pos bar
+	std::vector<D3DXVECTOR3> v;
+
+	// 0--1
+	// |  |
+	// 2--3
+
+	const float h = 1.0f;
+	const float w = 0.1f;
+	v.push_back(D3DXVECTOR3(0, +h, 0));
+	v.push_back(D3DXVECTOR3(w, +h, 0));
+	v.push_back(D3DXVECTOR3(0, -h, 0));
+	v.push_back(D3DXVECTOR3(w, -h, 0));
+
+	create_static_vertex_buffer(Graphics::instance().device(), v, &_renderer->_vb_current_pos);
+}
+bool App::init()
+{
+	ID3D11Device *device = Graphics::instance().device();
+	using namespace rt::D3D11;
+	_sampler.Attach(SamplerDescription().
+		Filter_(D3D11_FILTER_MIN_MAG_MIP_LINEAR).AddressU_(D3D11_TEXTURE_ADDRESS_CLAMP).AddressV_(D3D11_TEXTURE_ADDRESS_CLAMP).Create(device));
+	// use default state for lines
+	_lines_depth_state.Attach(DepthStencilDescription().Create(device));
+	_fs_depth_state.Attach(DepthStencilDescription().
+		DepthWriteMask_(D3D11_DEPTH_WRITE_MASK_ZERO).Create(device));
+
+	create_buffers();
+	return true;
+}
+
 DWORD WINAPI App::d3d_thread(void *params)
 {
 	App *wrapper = (App *)params;
@@ -336,11 +319,8 @@ DWORD WINAPI App::d3d_thread(void *params)
 	if (!g.init_directx(p->hwnd, p->width, p->height))
 		return NULL;
 
-  //wrapper->_tiny_text = new TinyTextContext_c(Graphics::instance().device(), Graphics::instance().context(), 128);
-
-
-
-  //CreateDeviceIndependentResources();
+	if (!wrapper->init())
+		return 1;
 
 	while (true) {
 		if (!wrapper->tick())
@@ -399,6 +379,11 @@ bool App::load_mp3(const WCHAR *filename)
 
 	_vs.load_vertex_shader("hosteddx/stuff.fx", "vsMain");
 	_ps.load_pixel_shader("hosteddx/stuff.fx", "psMain");
+
+	_fs_vs.load_vertex_shader("hosteddx/quad.fx", "vsMain");
+	_fs_ps.load_pixel_shader("hosteddx/quad.fx", "psMain");
+
+	rt::D3D11::SamplerDescription ss;
 
 	D3D11_INPUT_ELEMENT_DESC desc[] = { 
     CD3D11_INPUT_ELEMENT_DESC("POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0),

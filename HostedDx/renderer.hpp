@@ -21,7 +21,11 @@ struct TimeSlice
 struct Renderer
 {
   ~Renderer();
-	void render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11DeviceContext *context, const int32_t start_ms, const int32_t end_ms);
+	void render_at_time(EffectWrapper *vs, EffectWrapper *ps, ID3D11DeviceContext *context, const int32_t start_ms, const int32_t end_ms, const int32_t cur_pos);
   typedef std::vector<TimeSlice*> Slices;
 	Slices _slices;
+
+	CComPtr<ID3D11DepthStencilState> _dss_current_pos;
+	CComPtr<ID3D11Buffer> _vb_current_pos;
+
 };

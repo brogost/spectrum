@@ -83,10 +83,9 @@ extern "C"
     return FmodHelper::instance().get_paused();
 	}
 
-	HOST_EXPORT bool __stdcall set_paused(bool value)
+	HOST_EXPORT void __stdcall set_paused(bool value)
 	{
     FmodHelper::instance().pause(value);
-		return true;
 	}
 
 	HOST_EXPORT void __stdcall inc_lod()
@@ -108,6 +107,16 @@ extern "C"
   {
     App::instance().add_command(Command(kCmdDecRange));
   }
+
+	HOST_EXPORT void __stdcall inc_page()
+	{
+		App::instance().add_command(Command(kCmdIncPage));
+	}
+
+	HOST_EXPORT void __stdcall dec_page()
+	{
+		App::instance().add_command(Command(kCmdDecPage));
+	}
 
   HOST_EXPORT void __stdcall set_cutoff(float value)
   {

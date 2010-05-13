@@ -21,7 +21,7 @@ FmodHelper& FmodHelper::instance()
 	return *_instance;
 }
 
-uint32_t FmodHelper::pos_in_ms()
+int32_t FmodHelper::pos_in_ms()
 {
 	if (!_channel)
 		return 0;
@@ -29,6 +29,22 @@ uint32_t FmodHelper::pos_in_ms()
 	uint32_t pos;
 	_channel->getPosition(&pos, FMOD_TIMEUNIT_MS);
 	return pos;
+}
+
+void FmodHelper::change_pos(const int32_t ofs)
+{
+	if (!_channel)
+		return;
+
+	uint32_t cur;
+	_channel->getPosition(&cur, FMOD_TIMEUNIT_MS);
+
+	uint32_t len;
+	_sound->getLength(&len, FMOD_TIMEUNIT_MS);
+
+	int32_t new_pos = std::min<int32_t>(len, std::max<int32_t>(0, (int32_t)cur + ofs));
+
+	_channel->setPosition(new_pos, FMOD_TIMEUNIT_MS);
 }
 
 void FmodHelper::start()
@@ -41,7 +57,7 @@ void FmodHelper::start()
 		return;
 
 	_fmod_system->playSound(FMOD_CHANNEL_FREE, _sound, false, &_channel);
-	_channel->setVolume(0);
+	//_channel->setVolume(0);
 }
 
 void FmodHelper::stop()
